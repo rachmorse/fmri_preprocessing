@@ -4,7 +4,7 @@
 #**************** USAGE ******************
 #extract_wm_csf_eroded_masks.sh -s <subject_id> -r <reference_file> -a <aseg_file> -o <output_folder> -b <bold_file> -e <erode_mm>
 #bash <where_this_script_is>/extract_wm_csf_eroded_masks.sh -s -r -a -o -b -e
-#***************************************** 
+#*****************************************
 
 #SUBJECT_ID=sub-103151
 #REFERENCE_FILE=/home/mariacabello/wf_workspace/thesis_data/fmri2standard/$SUBJECT_ID/apply_topup_to_SBref/${SUBJECT_ID}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz

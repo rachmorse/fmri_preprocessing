@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-#creates a nuisance matrix and regresses the fMRI voxels on it and keeps the 
+#creates a nuisance matrix and regresses the fMRI voxels on it and keeps the
 #residuals
 
 import matplotlib.pyplot as plt
@@ -13,9 +13,9 @@ def motion_regressors(realign_movpar_txt, output_dir, order=0, derivatives=1):
     ----------
     realign_movpar_txt: [string] file path where realignment's motion parameters are
     output_dir: [string] directory path where the output is gonna be saved
-    order:                
+    order:
     derivatives:
-        
+
     Returns
     -------
     filename:
@@ -40,7 +40,7 @@ def motion_regressors(realign_movpar_txt, output_dir, order=0, derivatives=1):
         out_params = np.hstack((out_params, np.diff(cparams, d, axis=0)))
 
     out_params2 = out_params
-    #We will never use second order 
+    #We will never use second order
     #for i in range(1, order + 1):
         #out_params2 = np.hstack((out_params2, np.power(out_params, i)))
     filename = os.path.join(output_dir, "motion_regressor.txt")
@@ -54,7 +54,7 @@ def cosine_filter_txt (timepoints, timestep, output_dir,period_cut=128):
     period_cut:  minimum period for the cosine basis functions
     timestep : must be equal to the fmri TR
     timepoints: number of time volumes (length of the acquisition)
-    
+
     Returns
     -------
     filename:
@@ -82,7 +82,7 @@ def get_nuisance_regressors_wf(outdir, timepoints, subject_id, global_signal=Fal
     order:
     derivatives:
     comp:
-        
+
     Returns
     -------
     wf_reg:
@@ -91,17 +91,17 @@ def get_nuisance_regressors_wf(outdir, timepoints, subject_id, global_signal=Fal
     from nipype import Workflow, Node
     from nipype.interfaces import utility, fsl
     import os
-    
-    if global_signal: 
+
+    if global_signal:
         gb='_GB'
     else:
         gb=''
-        
+
     wf_reg=Workflow(name=subject_id+gb,base_dir=outdir);
-    
+
     print ("Setting INPUT node...");
     node_input = Node(utility.IdentityInterface(fields=[
-           "realign_movpar_txt",        
+           "realign_movpar_txt",
            'rfmri_unwarped_imgs',
            'mask_wm',
            'mask_csf',
@@ -109,15 +109,15 @@ def get_nuisance_regressors_wf(outdir, timepoints, subject_id, global_signal=Fal
            'bold_img'
            ]),
             name='input_node'
-    ) 
-    
+    )
+
     #Merging wm and csf masks
     node_merge_wm_csf = Node(utility.base.Merge(2),name='Merge_wm_csf')
-    
+
     #AcompCor
-    node_ACompCor=Node(confounds.ACompCor( 
+    node_ACompCor=Node(confounds.ACompCor(
             num_components=3,
-            #save_pre_filter='high_pass_filter.txt',       
+            #save_pre_filter='high_pass_filter.txt',
             pre_filter=False,
            # high_pass_cutoff=128,
             repetition_time=0.8,
@@ -127,45 +127,45 @@ def get_nuisance_regressors_wf(outdir, timepoints, subject_id, global_signal=Fal
            # mask_files='/institut/processed_data/BBHI_func/output2/sub-41064/GetMasksInT1Space/binarize_mask/MNI152_WM_09_warp_thresh.nii.gz',
              ),
     name="AcompCor_mask")
-    #node_ACompCor.inputs.save_pre_filter=os.path.join(os.path.join(os.path.join(wf_reg.base_dir,wf_reg.name),node_ACompCor.name), 'high_pass_filter.txt')  
+    #node_ACompCor.inputs.save_pre_filter=os.path.join(os.path.join(os.path.join(wf_reg.base_dir,wf_reg.name),node_ACompCor.name), 'high_pass_filter.txt')
 
-    #cosine_filter    
+    #cosine_filter
     node_cosine_filter_reg=Node(utility.Function(input_names=["timepoints", "timestep","period_cut","output_dir"],
                              output_names=["cosine_filter_txt"],
-                             function=cosine_filter_txt), 
-                                name="cosine_filter")    
-    node_cosine_filter_reg.inputs.output_dir=os.path.join(os.path.join(os.path.join(wf_reg.base_dir,wf_reg.name)),node_cosine_filter_reg.name) 
+                             function=cosine_filter_txt),
+                                name="cosine_filter")
+    node_cosine_filter_reg.inputs.output_dir=os.path.join(os.path.join(os.path.join(wf_reg.base_dir,wf_reg.name)),node_cosine_filter_reg.name)
     node_cosine_filter_reg.inputs.timepoints=timepoints
     node_cosine_filter_reg.inputs.timestep=0.8
     #node_cosine_filter_reg.overwrite=True
-    
-    #global_signal    
+
+    #global_signal
 #    if global_signal :
 #        node_global_signal=Node(utility.Function(input_names=["timeseries_file", "label_file", "filename"],
 #                                 output_names=["global_signal_txt"],
-#                                 function=extract_subrois), 
-#                                    name="global_signal")    
-#        node_global_signal.inputs.filename=os.path.join(os.path.join(os.path.join(os.path.join(wf_reg.base_dir,wf_reg.name)),node_global_signal.name),'global_signal.txt') 
+#                                 function=extract_subrois),
+#                                    name="global_signal")
+#        node_global_signal.inputs.filename=os.path.join(os.path.join(os.path.join(os.path.join(wf_reg.base_dir,wf_reg.name)),node_global_signal.name),'global_signal.txt')
 #        #node_global_signal.overwrite=True
 
     #motion regressors
     motion_regressors_interface = utility.Function(input_names=["realign_movpar_txt", "output_dir","order","derivatives"],
                              output_names=["motion_reg_txt"],
                              function=motion_regressors)
-    node_motion_regressors=Node(motion_regressors_interface, name="motion_regressors_txt")    
-    node_motion_regressors.inputs.output_dir=os.path.join(os.path.join(os.path.join(wf_reg.base_dir,wf_reg.name)),node_motion_regressors.name) 
+    node_motion_regressors=Node(motion_regressors_interface, name="motion_regressors_txt")
+    node_motion_regressors.inputs.output_dir=os.path.join(os.path.join(os.path.join(wf_reg.base_dir,wf_reg.name)),node_motion_regressors.name)
     #node_motion_regressors.overwrite=True
-    
-    
-    #merges all regressors     
-    node_merge_txts = Node(utility.base.Merge(4),name='Merge_txt_inputs')    
-    
+
+
+    #merges all regressors
+    node_merge_txts = Node(utility.base.Merge(4),name='Merge_txt_inputs')
+
     node_merge_regressors = Node(utility.Function(input_names=["nuisance_txts", "output_dir"],
                              output_names=["nuisance_txt"],
                              function=merge_nuisance_regressors),
     name="merge_nuisance_txt")
-    node_merge_regressors.inputs.output_dir=os.path.join(os.path.join(wf_reg.base_dir,wf_reg.name),node_merge_regressors.name) 
-    
+    node_merge_regressors.inputs.output_dir=os.path.join(os.path.join(wf_reg.base_dir,wf_reg.name),node_merge_regressors.name)
+
     node_filter_regressor = Node(fsl.FilterRegressor(
             #design_file (-d) nuissance_txt
             filter_all=True,
@@ -173,36 +173,36 @@ def get_nuisance_regressors_wf(outdir, timepoints, subject_id, global_signal=Fal
             #out_file
             ),
     name="filter_regressors_bold")
-    
-    
+
+
     node_output = Node(utility.IdentityInterface(fields=[
-        'nuisance_txt', 
+        'nuisance_txt',
         'bold_nuisance_filtered'
     ]),
-    name='output_node') 
-    
+    name='output_node')
+
     wf_reg.connect([ (node_input, node_merge_wm_csf, [('mask_wm','in1'),
                                                       ('mask_csf', 'in2')]),
                      (node_input, node_ACompCor,[('rfmri_unwarped_imgs', 'realigned_file')]),
                      (node_merge_wm_csf, node_ACompCor, [('out', 'mask_files')]),
-                     (node_input, node_motion_regressors,[('realign_movpar_txt', 'realign_movpar_txt')]),                     
-                     
+                     (node_input, node_motion_regressors,[('realign_movpar_txt', 'realign_movpar_txt')]),
+
                      (node_motion_regressors,node_merge_txts, [('motion_reg_txt', 'in1')]),
                      (node_ACompCor,node_merge_txts, [('components_file', 'in2')]),
                      (node_cosine_filter_reg,node_merge_txts, [('cosine_filter_txt', 'in3')]),
                      (node_merge_txts, node_merge_regressors, [('out', 'nuisance_txts')]),
-                     ])   
-#    if global_signal:       
+                     ])
+#    if global_signal:
 #         wf_reg.connect([
 #                         (node_input, node_global_signal,[('rfmri_unwarped_imgs', 'timeseries_file'),
-#                                                     ('global_mask_img', 'label_file')]),    
-#                        (node_global_signal, node_merge_txts, [('global_signal_txt', 'in4')])                
+#                                                     ('global_mask_img', 'label_file')]),
+#                        (node_global_signal, node_merge_txts, [('global_signal_txt', 'in4')])
 #                         ])
-    
+
     wf_reg.connect([    (node_merge_regressors, node_filter_regressor, [('nuisance_txt','design_file')]),
                         (node_input, node_filter_regressor, [('bold_img','in_file')]),
                         (node_filter_regressor, node_output, [('out_file','bold_nuisance_filtered')]),
-                        (node_merge_regressors, node_output,[('nuisance_txt', 'nuisance_txt')])                
+                        (node_merge_regressors, node_output,[('nuisance_txt', 'nuisance_txt')])
                          ])
     return wf_reg
 
@@ -224,7 +224,7 @@ def get_nuisance_regressors_wf(outdir, timepoints, subject_id, global_signal=Fal
 #    from nipype.utils import NUMPY_MMAP, filemanip
 #    import os
 #    import numpy as np
-#    
+#
 #    img = nb.load(timeseries_file, mmap=NUMPY_MMAP)
 #    data = img.get_data()
 #    roiimg = nb.load(label_file, mmap=NUMPY_MMAP)
@@ -232,27 +232,27 @@ def get_nuisance_regressors_wf(outdir, timepoints, subject_id, global_signal=Fal
 #    prefix = filemanip.split_filename(timeseries_file)[1]
 #    out_ts_file = os.path.join(os.getcwd(), 'img.nii.gz' )
 #   # with open(out_ts_file, 'wt') as fp:
-#    data2=data.copy() 
+#    data2=data.copy()
 #    data_txt=[]
 #    for fsindex in indices:
 #        ijk = np.nonzero(rois == fsindex)
 #        data2[ijk]=2
 #        ts = np.mean(data[ijk], axis=0)
 #        data_txt.append(ts)
-#    t_means=np.hstack(data_txt)    
+#    t_means=np.hstack(data_txt)
 #    np.savetxt(filename, t_means, fmt=b"%.10f")
 #    return filename
 
 
 def merge_nuisance_regressors (nuisance_txts, output_dir, standardize=True):
-    
+
     #https://www.ncbi.nlm.nih.gov/pubmed/30666750
     #Serial filtering introduces spurious correlations: SOLUTIONS:
     #(a) combining all steps into a single linear filter, or (b) sequential orthogonalization of covariates/linear filters performed in series.
     #our procedure is a)
     import numpy as np
     import os
-    
+
     out_files = []
     # TODO: You're just making all these files then reading them in the next function. Why doing so much read and write?
     # TODO: consider passing the data directly
@@ -275,7 +275,7 @@ def merge_nuisance_regressors (nuisance_txts, output_dir, standardize=True):
                 txt_values=(txt_values-txt_values.mean(axis=0))/np.std(txt_values,axis=0)
             txts_values.append(txt_values)
         out_params = np.hstack((txts_values))
-    
+
     #adds column of ones
     out_params=np.hstack((np.ones((len(out_params),1)),out_params))
     filename = os.path.join(output_dir, "all_nuisances.txt")

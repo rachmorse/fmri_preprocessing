@@ -7,4 +7,4 @@ Changes:
 4. Remove the `runfile` uses and call the functions directly
 5. Consider removing the data -> text -> data pattern, and just using the data directly
 6. Clean up the really long nipype.connect functions. Split up if you can
-7. 
+7.
