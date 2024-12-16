@@ -1,0 +1,96 @@
+[tool.poetry]
+name = "preprocessing"
+version = "0.0.1"
+description = ""
+authors = []
+repository = "https://github.com/rachmorse/preprocessing.git"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+nipype = "^1.9.1"
+matplotlib = "^3.9.3"
+numpy = "^2.2.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=6,<7"
+pytest-cov = ">=3.0,<4.0"
+pre-commit = "^3.4.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+include = ["src/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "D", "W", "C90", "N", "A", "RUF", "SIM", "PL"]
+ignore = [
+  "E501",  # Line too long (more than 79 characters).
+  "B905",  # Ignore zip without explicit strict.
+  "C901",  # Function is too complex (complexity is measured by cyclomatic complexity).
+  "D107",  # Missing docstring in a public __init__ method.
+  "RUF001",  # Character strings contains ambiguous unicode character.
+  "PLR0913"  # Too many arguments in function or method (function has too many parameters).
+]
+extend-select = ["I"]
+mccabe.max-complexity = 10
+pydocstyle.convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.ruff.format]
+docstring-code-format = true
+preview = true
+
+[tool.pydoclint]
+style = "google"
+arg-type-hints-in-signature = true
+arg-type-hints-in-docstring = false
+skip-checking-short-docstrings = false
+check-return-types = false
+check-yield-types = false
+
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = false
+ignore-magic = false
+ignore-semiprivate = false
+ignore-private = false
+ignore-property-decorators = false
+ignore-module = false
+ignore-nested-functions = false
+ignore-nested-classes = true
+ignore-setters = false
+fail-under = 100
+exclude = ["docs", "build", "src/tests"]
+ignore-regex = [
+  "^_init_*",
+  "^_to_lower$",
+  "^_to_datetime$",
+  "^get$",
+  "^mock_.*",
+  ".*BaseClass.*",
+]
+# possible values: 0 (minimal output), 1 (-v), 2 (-vv)
+verbose = 2
+quiet = false
+whitelist-regex = []
+color = true
+omit-covered-files = false
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
+[tool.coverage.run]
+branch = true
+source = ["src"]

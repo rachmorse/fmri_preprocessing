@@ -1,0 +1,41 @@
+### WARNING! This is a generated file and should ONLY be edited in https://github.com/BeZeroCarbon/data-template
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: "v4.4.0"
+    hooks:
+      - id: check-toml
+      - id: check-yaml
+        exclude: infrastructure/.* # regex not glob
+        args: ["--unsafe"]
+      - id: end-of-file-fixer
+        exclude: '^docs/'
+      - id: trailing-whitespace
+        exclude: '^docs/'
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: detect-aws-credentials
+        args: ["--allow-missing-credentials"]
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.8.0"
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix, --config=pyproject.toml]
+      - id: ruff-format
+        args: [--config=pyproject.toml]
+
+  - repo: https://github.com/jsh9/pydoclint
+    rev: 0.5.9
+    hooks:
+      - id: pydoclint
+
+  - repo: https://github.com/econchick/interrogate
+    rev: 1.5.0
+    hooks:
+      - id: interrogate
+        exclude: ^scripts/
+        args: [-vv, --fail-under=100, src]
+        pass_filenames: false
