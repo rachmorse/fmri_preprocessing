@@ -1,902 +1,735 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Created on Thu Aug 25 01:06:21 2022
-
-@author: mariacabello
 """
-
-# exec(open('/home/mariacabello/git_projects/MRI_preprocess/Functional/bold2T1_wf.py').read())
-# exec(open('/home/mariacabello/git_projects/MRI_preprocess/Functional/bold_nuisance_correction_wf.py').read())
-# TODO: do not do this. This should be in a function, not run "as a file"
-runfile(
-    "/home/mariacabello/git_projects/MRI_preprocess/Functional/bold2T1_wf.py",
-    wdir="/home/mariacabello/git_projects/MRI_preprocess/Functional",
-)
-runfile(
-    "/home/mariacabello/git_projects/MRI_preprocess/Functional/bold_nuisance_correction_wf.py",
-    wdir="/home/mariacabello/git_projects/MRI_preprocess/Functional",
-)
-
-import logging
-
-from bold2T1_wf import get_fmri2standard_wf
-from bold_nuisance_correction_wf import get_nuisance_regressors_wf
-
-# TDOO: implement logging
-logging.basicConfig(filename="logs.log")
-
+This script executes fMRI preprocessing workflows with configurable paths.
+"""
 
 import datetime
 import os
 from multiprocessing import Pool
+import logging
+import shutil
+import subprocess
+import gzip
 
+# Nipype interfaces
 from nipype.algorithms.confounds import ComputeDVARS, FramewiseDisplacement
-from nipype.interfaces import spm
+from nipype.interfaces import spm, utility
+from nipype import Node, Workflow
 
-# TODO: convert these folder names to cli arguments
-root_path = "/home/mariacabello/wf_workspace/bold_preprocess_SA"
+# Custom workflow imports
+from bold2T1_wf import get_fmri2standard_wf
+from bold_nuisance_correction_wf import get_nuisance_regressors_wf
 
-heudiconv_folder = "func_anat"
-fmri2standard_folder = "fmri2standard"
-bids_path = root_path + "/func_anat"
-fmri2standard_path = root_path + "/" + fmri2standard_folder
-nuisance_correction_path = root_path + "/nuisance_correction"
-recon_all_path = root_path + "/recon_all"  # /home/mariacabello/wf_workspace/bold_preprocess_SA/recon_all"
-qc_path = root_path + "/QC"
+def prepare_data(subject_id, recon_all_path, source_dir):
+    """
+    Prepare necessary directories and copy MRI data for a given subject.
 
-# TODO: I think we need to understand what this is
-coreg_EPI2T1 = spm.Coregister(
-    # target (reference; fixed) [in .nii]
-    # source (souce; moving) [in .nii]
-    # apply_to_files (moving) [in .nii]
-)
+    Parameters:
+    subject_id (str): The identifier for the subject whose data is being prepared.
+    recon_all_path (str): The directory path for recon_all data storage.
+    source_dir (str): The directory where source MRI data is located.
 
-
-def prepare_data(subject_id):
+    Returns:
+        None
+    """
     try:
-        if not os.path.isfile(recon_all_path + "/" + subject_id + "/mri/aseg.mgz"):
-            print("Copying aseg.mgz and brain.mgz from institut_recon_all...")
-            # TODO: there is an os.makedirs function that would be better for this function
-            os.system("mkdir " + recon_all_path + "/" + subject_id)
-            os.system("mkdir " + recon_all_path + "/" + subject_id + "/mri")
+        # Construct paths
+        subject_dir = os.path.join(recon_all_path, subject_id)
+        mri_dir = os.path.join(subject_dir, "mri")
+        aseg_file = os.path.join(mri_dir, "aseg.mgz")
 
-            # TODO: there is also a better way of copying files. If you want to do it only temporarily (i.e. you want it to delete the files when the run is done) you can use the TemporaryDirectory library
-            # part of the stdlib.
-            os.system(
-                "cp /institut/UB/Superagers/MRI/freesurfer-reconall/"
-                + subject_id
-                + "/mri/aseg.mgz "
-                + recon_all_path
-                + "/"
-                + subject_id
-                + "/mri"
-            )
-            os.system(
-                "cp /institut/UB/Superagers/MRI/freesurfer-reconall/"
-                + subject_id
-                + "/mri/brain.mgz "
-                + recon_all_path
-                + "/"
-                + subject_id
-                + "/mri"
-            )
+        # Check if the aseg.mgz file is already present
+        if not os.path.isfile(aseg_file):
+            print("Copying aseg.mgz and brain.mgz from institut_recon_all...")
+
+            # Create required directories
+            os.makedirs(mri_dir, exist_ok=True)
+
+            # Define source directory where files are copied from
+            source_dir_mri = os.path.join(source_dir, subject_id, "mri")
+
+            # Copy files to the destination directory
+            shutil.copy(os.path.join(source_dir_mri, "aseg.mgz"), mri_dir)
+            shutil.copy(os.path.join(source_dir_mri, "brain.mgz"), mri_dir)
         else:
             print("aseg.mgz and brain.mgz already copied")
-    except:
-        # TODO: You should do actual logging here. There is a great library called logging that can output errors to logs automatically without this
-        with open(root_path + "/fmri2standard/errors.txt", "a") as f:
-            f.write(
-                str(datetime.datetime.now())
-                + "\t"
-                + subject_id
-                + " did not executed cleanly while COPYING ASEG.MGZ & BRAIN.MGZ\n"
-            )
+    except Exception as e:
+        logging.error("Error copying aseg.mgz & brain.mgz for subject %s: %s", subject_id, e)
 
-        # TODO: return(0) is not a python pattern
-        return 0
+# def run_workflows(bids_path, fmri2standard_path, nuisance_correction_path, recon_all_path, qc_path):
+    """
+    Run key fMRI preprocessing workflows.
+
+    This function executes two main workflows:
+    1. fMRI to Standard Space Transformation
+       - Aligns fMRI data to standard anatomical space using `get_fmri2standard_wf`.
+    
+    2. BOLD Nuisance Correction
+       - Removes nuisance signals from BOLD data using `get_nuisance_regressors_wf`.
+    
+    Logs the success or failure of each workflow.
+    """
+    try:
+        # Execute the fMRI to standard space transformation workflow
+        fmri_to_standard = get_fmri2standard_wf()
+        fmri_to_standard.run()
+        logging.info("fMRI to standard space workflow completed successfully.")
+    except Exception as e:
+        logging.error("Error in fMRI to standard space workflow: %s", e)
 
     try:
-        # TODO: same with this stuff - os.makedirs and os.cp (i think but google it) is way better and also have an exist_ok=True option so you don't need any sort of error handling
-        if not os.path.isdir(root_path + "/" + heudiconv_folder + "/" + subject_id):
-            print("Copying bids from institut_bids...")
-            os.system("mkdir " + root_path + "/" + heudiconv_folder + "/" + subject_id)
-            os.system("mkdir " + root_path + "/" + heudiconv_folder + "/" + subject_id + "/ses-01")
-            os.system(
-                "cp -r /institut/UB/Superagers/MRI/BIDS/"
-                + subject_id
-                + "/ses-01/func "
-                + root_path
-                + "/"
-                + heudiconv_folder
-                + "/"
-                + subject_id
-                + "/ses-01"
-            )
-            os.system(
-                "cp -r /institut/UB/Superagers/MRI/BIDS/"
-                + subject_id
-                + "/ses-01/anat "
-                + root_path
-                + "/"
-                + heudiconv_folder
-                + "/"
-                + subject_id
-                + "/ses-01"
-            )
-        else:
-            print("Bids already copied")
-    except:
-        with open(root_path + "/fmri2standard/errors.txt", "a") as f:
-            f.write(
-                str(datetime.datetime.now()) + "\t" + subject_id + " did not executed cleanly while COPYING FUNC-ANAT\n"
-            )
-        return 0
+        # Execute the BOLD nuisance correction workflow
+        nuisance_correction = get_nuisance_regressors_wf()
+        nuisance_correction.run()
+        logging.info("BOLD nuisance correction workflow completed successfully.")
+    except Exception as e:
+        logging.error("Error in BOLD nuisance correction workflow: %s", e)
 
+# Coregistration setup, to align EPI to T1, should be added here with appropriate file paths.
+# Example:
+# coreg_EPI2T1 = spm.Coregister()
+# coreg_EPI2T1.inputs.target = target_image_path
+# coreg_EPI2T1.inputs.source = source_image_path
+# coreg_EPI2T1.inputs.apply_to_files = [additional_image_paths]
+# coreg_EPI2T1.run()
+    
+def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path, current_script_dir, write_graph=False):    
+    """
+    Transform fMRI data to a standard space for a given subject.
 
-# TODO: call this a better name
-def execute_preprocessing_part1(subject_id, write_graph: bool = False):
+    This function sets up and runs a workflow to align fMRI data to standard
+    MNI space. It also prepares required data and logs any errors encountered.
+
+    Parameters:
+    subject_id (str): The identifier for the subject being processed.
+    write_graph (bool): Whether to write a workflow graph. Defaults to False.
+    root_path (str): The root path for the preprocessing workspace.
+    bids_path (str): The path to the BIDS folder. 
+    recon_all_path (str): The path to the recon_all directory.
+    current_script_dir (str): The directory where this script is located.
+    """
     print("##################################################")
-    print(subject_id)
+    print(f"Processing subject: {subject_id}")
     print("##################################################")
 
     prepare_data(subject_id)
 
-    print("\n\nFMRI TO STANDARD\n\n")
-    # FYI: you shouldn't put everything in massive try except blocks like this. It hides errors
+    print("\n\FMRI TO STANDARD\n\n")
+
     try:
-        # defines WF
+        # Define the workflow
         fmri2t1_wf = get_fmri2standard_wf(
-            [10, 750], subject_id, "/home/mariacabello/git_projects/MRI_preprocess/Functional/acparams_hcp.txt"
+            [10, 750], # [10, 750] correspond to the first and last volumes with the first 10 removed
+            subject_id, 
+            os.path.join(current_script_dir, '../../acparams_hcp.txt')
         )
 
-        fmri2t1_wf.base_dir = root_path + "/fmri2standard"
+        fmri2t1_wf.base_dir = os.path.join(root_path, "fmri2standard")
 
-        # sets necessary inputs
-        # TODO: you should use fstrings instead - lot easier to read f""
-
-        inputs = {
+        # Set necessary inputs using f-strings
+        fmri2t1_wf.inputs.input_node = {
             "T1_img": f"{bids_path}/{subject_id}/ses-01/anat/{subject_id}_ses-01_run-01_T1w.nii.gz",
             "func_bold_ap_img": f"{bids_path}/{subject_id}/ses-01/func/{subject_id}_ses-01_run-01_rest_bold_ap.nii.gz",
+            "func_sbref_img": f"{bids_path}/{subject_id}/ses-01/func/{subject_id}_ses-01_run-01_rest_sbref_ap.nii.gz",
+            "func_segfm_ap_img": f"{bids_path}/{subject_id}/ses-01/func/{subject_id}_ses-01_run-01_rest_sefm_ap.nii.gz",
+            "func_segfm_pa_img": f"{bids_path}/{subject_id}/ses-01/func/{subject_id}_ses-01_run-01_rest_sefm_pa.nii.gz",
+            "T1_brain_freesurfer_mask": f"{recon_all_path}/{subject_id}/mri/brain.mgz"
         }
-
-        fmri2t1_wf.inputs.input_node = inputs
-
-        # fmri2t1_wf.inputs.input_node.T1_img = f"{bids_path}/{subject_id}/ses-01/anat/{subject_id}_ses-01_run-01_T1w.nii.gz"
-        fmri2t1_wf.inputs.input_node.T1_img = (
-            bids_path + "/{subject_id}/ses-01/anat/{subject_id}_ses-01_run-01_T1w.nii.gz".format(subject_id=subject_id)
-        )
-        fmri2t1_wf.inputs.input_node.func_bold_ap_img = (
-            bids_path
-            + "/{subject_id}/ses-01/func/{subject_id}_ses-01_run-01_rest_bold_ap.nii.gz".format(subject_id=subject_id)
-        )
-        fmri2t1_wf.inputs.input_node.func_sbref_img = (
-            bids_path
-            + "/{subject_id}/ses-01/func/{subject_id}_ses-01_run-01_rest_sbref_ap.nii.gz".format(subject_id=subject_id)
-        )
-        fmri2t1_wf.inputs.input_node.func_segfm_ap_img = (
-            bids_path
-            + "/{subject_id}/ses-01/func/{subject_id}_ses-01_run-01_rest_sefm_ap.nii.gz".format(subject_id=subject_id)
-        )
-        fmri2t1_wf.inputs.input_node.func_segfm_pa_img = (
-            bids_path
-            + "/{subject_id}/ses-01/func/{subject_id}_ses-01_run-01_rest_sefm_pa.nii.gz".format(subject_id=subject_id)
-        )
-        # fmri2t1_wf.inputs.input_node.T1_brain_freesurfer_mask = '/institut/BBHI/MRI/processed_data/freesurfer-reconall/{subject_id}/mri/brainmask.mgz'.format(subject_id=subject_id)
-        fmri2t1_wf.inputs.input_node.T1_brain_freesurfer_mask = recon_all_path + "/{subject_id}/mri/brain.mgz".format(
-            subject_id=subject_id
-        )
-
-        #    fmri2t1_wf.inputs.input_node.root_path=root_path
-        #    fmri2t1_wf.inputs.input_node.fmri2standard_folder=fmri2standard_folder
-        #    fmri2t1_wf.inputs.input_node.heudiconv_folder=heudiconv_folder
-        #    fmri2t1_wf.inputs.input_node.subject_id=subject_id
-        #    fmri2t1_wf.inputs.input_node.mode_tonii="to_nii"
-        #    fmri2t1_wf.inputs.input_node.mode_fromnii="to_nii_gz"
 
         if write_graph:
             fmri2t1_wf.write_graph()
 
-        # writes WF graph and runs it
-        # fmri2t1_wf.write_graph()
+        # Run the workflow
         fmri2t1_wf.run()
-    except:
-        with open(root_path + "/fmri2standard/errors.txt", "a") as f:
-            f.write(str(datetime.datetime.now()) + "\t" + subject_id + " did not executed cleanly while FMRI2T1_WF\n")
-        return 0
 
+    except Exception as e:
+        logging.error(
+            "Error in fMRI to Standard Workflow for subject %s: %s", subject_id, e
+        )
+        return None
+    
+def execute_coregistration(subject_id, root_path, fmri2standard_folder, heudiconv_folder, coreg_EPI2T1):
+    """
+    Perform coregistration of BOLD images to standard T1 for a given subject.
 
-def execute_preprocessing_part2(subject_id):
+    This function converts intermediate files using a script, sets input paths,
+    and performs SPM coregistration. It logs errors encountered during execution.
+
+    Parameters:
+    subject_id (str): The identifier for the subject being processed.
+    root_path (str): The root path for data storage.
+    fmri2standard_folder (str): Directory within root_path for fMRI to standard transformations.
+    heudiconv_folder (str): Directory within root_path for heuristic DICOM conversions.
+    coreg_EPT2T1 (spm.Coregister): The coregistration object for aligning EPI to T1.
+    """
     try:
-        #        sbref_path = root_path+'/'+fmri2standard_folder+"/{subject_id}/apply_topup_to_SBref/{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii".format(subject_id=subject_id)
-        #        bold_path = root_path+'/'+fmri2standard_folder+"/{subject_id}/apply_topup/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii".format(subject_id=subject_id)
-
-        # TODO: this can all be done in Python rather than hiding it in a bash script. ZipFile is a good library for this
-        # Creating intermediate unziped .nii files
-        os.system(
-            "bash intermediate-files_SPM-coregister2T1_nii-format.sh -r "
-            + root_path
-            + " -f "
-            + fmri2standard_folder
-            + " -b "
-            + heudiconv_folder
-            + " -s "
-            + subject_id
-            + " -m to_nii"
+        # Create intermediate unzipped .nii files using subprocess
+        subprocess.run(
+            ["bash", "intermediate-files_SPM-coregister2T1_nii-format.sh",
+             "-r", root_path,
+             "-f", fmri2standard_folder,
+             "-b", heudiconv_folder,
+             "-s", subject_id,
+             "-m", "to_nii"],
+            check=True
         )
 
-        sbref2T1_path = (
-            root_path
-            + "/"
-            + fmri2standard_folder
-            + "/{subject_id}/spm_coregister2T1_sbref/{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii".format(
-                subject_id=subject_id
-            )
-        )
-        bold2T1_path = (
-            root_path
-            + "/"
-            + fmri2standard_folder
-            + "/{subject_id}/spm_coregister2T1_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii".format(
-                subject_id=subject_id
-            )
-        )
+        # Define paths using os.path.join
+        sbref2T1_path = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_sbref",
+                                     f"{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii")
+        bold2T1_path = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_bold",
+                                    f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii")
 
-        # SPM coregistration EPI to Standard T1
-        # TODO: i don't know anythign about this library, but i'm sure there is a prettier way of doing this
-        coreg_EPI2T1.inputs.target = (
-            root_path
-            + "/"
-            + heudiconv_folder
-            + "/{subject_id}/ses-01/anat/{subject_id}_ses-01_run-01_T1w.nii".format(subject_id=subject_id)
-        )
+        # SPM coregistration: Align BOLD to standard T1
+        target_path = os.path.join(root_path, heudiconv_folder, subject_id, "ses-01", "anat",
+                                   f"{subject_id}_ses-01_run-01_T1w.nii")
+        coreg_EPI2T1.inputs.target = target_path
         coreg_EPI2T1.inputs.source = sbref2T1_path
         coreg_EPI2T1.inputs.jobtype = "estimate"
-        coreg_EPI2T1.inputs.apply_to_files = bold2T1_path
+        coreg_EPI2T1.inputs.apply_to_files = [bold2T1_path]
 
         coreg_EPI2T1.run()
 
-        # TODO: again, this can be done in Python rather than hiding it in a bash script
-        # use TemporaryDirectory
-        # Deleting intermediate unziped .nii files
-        os.system(
-            "bash intermediate-files_SPM-coregister2T1_nii-format.sh -r "
-            + root_path
-            + " -f "
-            + fmri2standard_folder
-            + " -b "
-            + heudiconv_folder
-            + " -s "
-            + subject_id
-            + " -m to_nii_gz"
+        # Delete intermediate unzipped .nii files using subprocess
+        subprocess.run(
+            ["bash", "intermediate-files_SPM-coregister2T1_nii-format.sh",
+             "-r", root_path,
+             "-f", fmri2standard_folder,
+             "-b", heudiconv_folder,
+             "-s", subject_id,
+             "-m", "to_nii_gz"],
+            check=True
         )
 
-    except:
-        with open(root_path + "/fmri2standard/errors.txt", "a") as f:
-            f.write(
-                str(datetime.datetime.now())
-                + "\t"
-                + subject_id
-                + " did not executed cleanly while SPM COREGISTRATION\n"
-            )
+    except Exception as e:
+        logging.error("Error during SPM coregistration for subject %s: %s", subject_id, e)
+        with open(os.path.join(root_path, 'fmri2standard', 'errors.txt'), 'a') as f:
+            f.write(f"{datetime.now()}\t{subject_id} did not execute cleanly during SPM coregistration\n")
 
+def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_path):  
+    """
+    Extract white matter (WM) and cerebrospinal fluid (CSF) masks for nuisance correction.
 
-def execute_preprocessing_part3_1(subject_id):
+    This function prepares paths, creates necessary directories, and executes
+    a mask extraction script. Errors during this process are logged.
+
+    Parameters:
+    subject_id (str): The identifier for the subject being processed.
+    root_path (str): The root path for data storage.
+    fmri2standard_folder (str): Directory within root_path for fMRI to standard transformations.
+    recon_all_path (str): Directory for FreeSurfer reconall data.
+    """
     print("\n\nNUISANCE CORRECTION\n\n")
     try:
-        sbref2T1_path = (
-            root_path
-            + "/"
-            + fmri2standard_folder
-            + "/{subject_id}/spm_coregister2T1_sbref/{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii".format(
-                subject_id=subject_id
-            )
+        # Define paths 
+        # Im commenting this out because it is not used in the function - but leaving in case it is needed for something
+        # sbref2T1_path = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_sbref",
+        #     f"{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz")
+        bold2T1_path = os.path.join(
+            root_path, fmri2standard_folder, subject_id,
+            "spm_coregister2T1_bold",
+            f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz"
         )
-        bold2T1_path = (
-            root_path
-            + "/"
-            + fmri2standard_folder
-            + "/{subject_id}/spm_coregister2T1_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii".format(
-                subject_id=subject_id
+        output_masks = os.path.join(root_path, "nuisance_correction", subject_id, "masks_csf_wm")
+        aseg_folder = os.path.join(recon_all_path, subject_id, "mri", "aseg.mgz")
+
+        # Create necessary directories
+        os.makedirs(os.path.join(root_path, "nuisance_correction", subject_id), exist_ok=True)
+        os.makedirs(output_masks, exist_ok=True)
+
+        # Execute the mask extraction script with subprocess
+        try:
+            subprocess.run(
+                ["bash", "extract_wm_csf_eroded_masks.sh",
+                 "-s", subject_id,
+                 "-a", aseg_folder,
+                 "-r", bold2T1_path,
+                 "-o", output_masks,
+                 "-b", bold2T1_path,
+                 "-e", "2"],
+                check=True
             )
-        )
+        except subprocess.CalledProcessError as e:
+            logging.error("Error during WM and CSF mask extraction for subject %s: %s", subject_id, e)
+            return None
 
-        # Extracting masks from bold (wm and csf)
-        sbref2T1_path = sbref2T1_path + ".gz"
-        bold2T1_path = bold2T1_path + ".gz"
-        output_masks = root_path + "/nuisance_correction" + "/" + subject_id + "/masks_csf_wm"
-        aseg_folder = recon_all_path + "/" + subject_id + "/mri/aseg.mgz"
-        os.system("mkdir -p " + root_path + "/nuisance_correction" + "/" + subject_id)
-        os.system("mkdir -p " + output_masks)
+    except Exception as e:
+        logging.error("Error in extracting WM and CSF masks for subject %s: %s", subject_id, e)
+        return None
 
-        # TODO: fyi, os.system i think is quite insecure. not a bit deal but i'd use subprocess instead
-        os.system(
-            "bash extract_wm_csf_eroded_masks.sh -s "
-            + subject_id
-            + " -a "
-            + aseg_folder
-            + " -r "
-            + bold2T1_path
-            + " -o "
-            + output_masks
-            + " -b "
-            + bold2T1_path
-            + " -e 2"
-        )
+## STOPPED HERE - NEED TO FINISH THE REST OF THE FUNCTIONS    
+def run_nuisance_regression(subject_id, root_path):
+    """
+    Run the nuisance regression workflow using pre-extracted masks.
 
-    except:
-        with open(root_path + "/nuisance_correction/errors_wmcsfextraction.txt", "a") as f:
-            f.write(
-                str(datetime.datetime.now())
-                + "\t"
-                + subject_id
-                + " did not executed cleanly while EXTRACTING WM AND CSF MASKS\n"
-            )
-        return 0
+    This function sets up a workflow for removing nuisance signals from fMRI data.
+    Errors during this process are logged.
 
-
-def execute_preprocessing_part3_2(subject_id):
+    Parameters:
+    subject_id (str): The identifier for the subject being processed.
+    root_path (str): The root path for data storage.
+    """
     try:
-        # defines WF
         wf_reg = get_nuisance_regressors_wf(
-            outdir=root_path + "/nuisance_correction", subject_id=subject_id, timepoints=740
+            outdir=os.path.join(root_path, "nuisance_correction"),
+            subject_id=subject_id,
+            timepoints=740
         )
 
-        # sets necessary inputs
-        wf_reg.inputs.input_node.realign_movpar_txt = (
-            root_path
-            + "/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf.nii.gz.par".format(
-                subject_id=subject_id
-            )
+        # Set necessary inputs
+        wf_reg.inputs.input_node.realign_movpar_txt = os.path.join(
+            root_path, "fmri2standard", subject_id, "realign_fmri2SBref",
+            f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf.nii.gz.par"
         )
-        wf_reg.inputs.input_node.rfmri_unwarped_imgs = (
-            root_path
-            + "/fmri2standard/{subject_id}/spm_coregister2T1_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz".format(
-                subject_id=subject_id
-            )
+        wf_reg.inputs.input_node.rfmri_unwarped_imgs = os.path.join(
+            root_path, "fmri2standard", subject_id, "spm_coregister2T1_bold",
+            f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz"
         )
-        # wf_reg.inputs.input_node.masks_imgs = root_path+'/nuisance_correction/{subject_id}/masks_csf_wm/wm_binmask.nii.gz'.format(subject_id=subject_id)
-        wf_reg.inputs.input_node.mask_wm = (
-            root_path + "/nuisance_correction/{subject_id}/masks_csf_wm/wm_binmask.nii.gz".format(subject_id=subject_id)
+        wf_reg.inputs.input_node.mask_wm = os.path.join(
+            root_path, "nuisance_correction", subject_id, "masks_csf_wm", "wm_binmask.nii.gz"
         )
-        wf_reg.inputs.input_node.mask_csf = (
-            root_path
-            + "/nuisance_correction/{subject_id}/masks_csf_wm/csf_binmask.nii.gz".format(subject_id=subject_id)
+        wf_reg.inputs.input_node.mask_csf = os.path.join(
+            root_path, "nuisance_correction", subject_id, "masks_csf_wm", "csf_binmask.nii.gz"
         )
-        # CONNECT WITH fmri2standard WF
-        wf_reg.inputs.input_node.bold_img = (
-            root_path
-            + "/fmri2standard/{subject_id}/spm_coregister2T1_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz".format(
-                subject_id=subject_id
-            )
+        wf_reg.inputs.input_node.bold_img = os.path.join(
+            root_path, "fmri2standard", subject_id, "spm_coregister2T1_bold",
+            f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz"
         )
 
-        # writes WF graph and runs it
-        # wf_reg.write_graph()
         wf_reg.run()
-    except:
-        with open(root_path + "/nuisance_correction/errors_nuisancewf.txt", "a") as f:
-            f.write(str(datetime.datetime.now()) + "\t" + subject_id + " did not executed cleanly while NUISANCE WF\n")
-        return 0
 
+    except Exception as e:
+        logging.error("Error in nuisance workflow for subject %s: %s", subject_id, e)
+        return None 
 
-def execute_preprocessing_part4(subject_id):
-    print(("\n\nMNI NORMALIZATION\n\n"))
+def mni_normalization(subject_id):
+    """
+    Perform MNI normalization on T1 and fMRI images for the given subject.
+
+    This function sets up the necessary files, decompresses them, and runs the SPM
+    normalization process. Errors during this process are logged.
+
+    Parameters:
+    subject_id (str): The identifier for the subject being processed.
+    """
+    print("\n\nMNI NORMALIZATION\n\n")
     try:
-        os.system("mkdir -p " + root_path + "/normalization/" + subject_id)
+        # Create necessary directory for normalization
+        normalization_dir = os.path.join(root_path, "normalization", subject_id)
+        os.makedirs(normalization_dir, exist_ok=True)
 
-        # SEGMENT T1
-        T1_niigz = bids_path + "/{subject_id}/ses-01/anat/{subject_id}_ses-01_run-01_T1w.nii.gz".format(
-            subject_id=subject_id
-        )
-        T1_niigzcopy = root_path + "/normalization/{subject_id}/{subject_id}_ses-01_run-01_T1w.nii.gz".format(
-            subject_id=subject_id
-        )
-        T1_nii = root_path + "/normalization/{subject_id}/{subject_id}_ses-01_run-01_T1w.nii".format(
-            subject_id=subject_id
-        )
+        # Setup file paths 
+        T1_niigz = os.path.join(bids_path, subject_id, "ses-01", "anat", f"{subject_id}_ses-01_run-01_T1w.nii.gz")
+        T1_niigzcopy = os.path.join(normalization_dir, f"{subject_id}_ses-01_run-01_T1w.nii.gz")
+        T1_nii = os.path.join(normalization_dir, f"{subject_id}_ses-01_run-01_T1w.nii")
 
-        os.system("cp " + T1_niigz + " " + T1_niigzcopy)
-        os.system("gunzip " + T1_niigzcopy)
+        # Copy and decompress T1 image
+        shutil.copy(T1_niigz, T1_niigzcopy)
+        with gzip.open(T1_niigzcopy, 'rb') as f_in:
+            with open(T1_nii, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
 
-        # APPLY DEFORMATION MNI
+        # Setup paths for sbref and bold images
+        bold_niigz = os.path.join(fmri2standard_path, subject_id, "spm_coregister2T1_bold",
+                                  f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz")
+        bold_niigzcopy = os.path.join(normalization_dir,
+                                      f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz")
+        bold_nii = os.path.join(normalization_dir,
+                                f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii")
 
-        bold_niigz = (
-            fmri2standard_path
-            + "/{subject_id}/spm_coregister2T1_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz".format(
-                subject_id=subject_id
-            )
-        )
-        bold_niigzcopy = (
-            root_path
-            + "/normalization/{subject_id}/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz".format(
-                subject_id=subject_id
-            )
-        )
-        bold_nii = (
-            root_path
-            + "/normalization/{subject_id}/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii".format(
-                subject_id=subject_id
-            )
-        )
-        sbref_niigz = (
-            fmri2standard_path
-            + "/{subject_id}/spm_coregister2T1_sbref/{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz".format(
-                subject_id=subject_id
-            )
-        )
-        sbref_niigzcopy = (
-            root_path
-            + "/normalization/{subject_id}/{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz".format(
-                subject_id=subject_id
-            )
-        )
-        sbref_nii = (
-            root_path
-            + "/normalization/{subject_id}/{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii".format(
-                subject_id=subject_id
-            )
-        )
-        os.system("cp " + bold_niigz + " " + bold_niigzcopy)
-        os.system("gunzip " + bold_niigzcopy)
-        os.system("cp " + sbref_niigz + " " + sbref_niigzcopy)
-        os.system("gunzip " + sbref_niigzcopy)
+        sbref_niigz = os.path.join(fmri2standard_path, subject_id, "spm_coregister2T1_sbref",
+                                   f"{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz")
+        sbref_niigzcopy = os.path.join(normalization_dir,
+                                       f"{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz")
+        sbref_nii = os.path.join(normalization_dir,
+                                 f"{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii")
 
+        # Copy and decompress bold image
+        shutil.copy(bold_niigz, bold_niigzcopy)
+        with gzip.open(bold_niigzcopy, 'rb') as f_in:
+            with open(bold_nii, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+
+        # Copy and decompress sbref image
+        shutil.copy(sbref_niigz, sbref_niigzcopy) 
+        with gzip.open(sbref_niigzcopy, 'rb') as f_in: # Decompress sbref image
+            with open(sbref_nii, 'wb') as f_out: # Write decompressed sbref image as .nii
+                shutil.copyfileobj(f_in, f_out) # Copy decompressed sbref image
+
+        # Perform MNI normalization
         MNI = spm.preprocess.Normalize12()
         MNI.inputs.image_to_align = T1_nii
-        MNI.inputs.apply_to_files = sbref_nii
+        MNI.inputs.apply_to_files = [sbref_nii, bold_nii]
         MNI.inputs.write_bounding_box = [[-90, -126, -72], [90, 90, 108]]
         MNI.run()
 
-        MNI = spm.preprocess.Normalize12()
-        MNI.inputs.image_to_align = T1_nii
-        MNI.inputs.apply_to_files = bold_nii
-        MNI.inputs.write_bounding_box = [[-90, -126, -72], [90, 90, 108]]
-        MNI.run()
+    except Exception as e:
+        logging.error("Error during MNI Normalization for subject %s: %s", subject_id, e)
+        return None
+    
+def apply_nuisance_correction(subject_id):
+    """
+    Apply nuisance correction for a given subject.
 
-    except:
-        with open(root_path + "/normalization/errors.txt", "a") as f:
-            f.write(
-                str(datetime.datetime.now()) + "\t" + subject_id + " did not executed cleanly while NORMALIZATION\n"
-            )
-        return 0
+    This function handles gzip compression, file movements, and uses FSL tools
+    for regressing out nuisance signals from the data.
 
-
-def execute_preprocessing_part5(subject_id):
-    print(("\n\\APPLYING NUISANCE CORRECTION\n\n"))
+    Parameters:
+    subject_id (str): Identifier for the subject being processed.
+    """
+    print("\n\\APPLYING NUISANCE CORRECTION\n\n")
     try:
-        nuisance_filter_bash = "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/command.txt".format(
-            subject_id=subject_id
-        )
-        new_name_nii = "/home/mariacabello/wf_workspace/bold_preprocess_SA/normalization/{subject_id}/w{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii".format(
-            subject_id=subject_id
-        )
+        # Define paths
+        nuisance_filter_bash = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/command.txt"
+        new_name_nii = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/normalization/{subject_id}/w{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii"
+        
+        mni_pre = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/normalization/{subject_id}/w{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz"
+        mni_post = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz"
+        nuisances = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/merge_nuisance_txt/all_nuisances.txt"
 
-        #        new_name_ = '\/home\/mariacabello\/wf_workspace\/thesis_data\/normalization\/{subject_id}\/w{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz'.format(subject_id=subject_id)
-        #        to_remove_ = '\/home\/mariacabello\/wf_workspace\/thesis_data\/fmri2standard\/{subject_id}\/spm_coregister2T1_bold\/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz'.format(subject_id=subject_id)
+        nuisance_output = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt.nii.gz"
+        native_name = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz"
+        MNI_name = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz"
+        
+        # Perform gzip compression and remove the NII file
+        subprocess.run(["gzip", "-f", new_name_nii], check=True)
+        os.remove(new_name_nii)
+        nuisance_output = f"{nuisance_filter_bash}_output.nii.gz"
+        
+        # Move and filter using the FSL regfilt command
+        shutil.move(nuisance_output, mni_post)
+        command_nuisance = [
+            "fsl_regfilt", "-i", mni_pre, "-o", mni_post,
+            "-d", nuisances, "-f", "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27"
+        ]
+        subprocess.run(command_nuisance, check=True)
 
-        nuisance_output = "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt.nii.gz".format(
-            subject_id=subject_id
-        )
-        native_name = "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz".format(
-            subject_id=subject_id
-        )
-        MNI_name = "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz".format(
-            subject_id=subject_id
-        )
+    except Exception as e:
+        logging.error("Error during nuisance correction for subject %s: %s", subject_id, e)
+        return None
+    
+def fmri_quality_control(subject_id):
+    """
+    Perform fMRI quality control for a given subject.
 
-        # TODO: use zipfile library
-        os.system("gzip " + new_name_nii)
-        os.system("rm " + new_name_nii)
-        os.system("mv " + nuisance_output + " " + native_name)
-        # print("sed -i 's/"+to_remove_+"/"+new_name_+"/g' "+nuisance_filter_bash)
+    This function involves calculating the framewise displacement and setting
+    up the brain mask and DVARS workflow.
 
-        # os.system("sed -i 's/"+to_remove_+"/"+new_name_+"/g' "+nuisance_filter_bash)
-        # os.system("bash "+nuisance_filter_bash)
-        # os.system("mv "+nuisance_output+" "+MNI_name)
-        mni_pre = (
-            "/home/mariacabello/wf_workspace/bold_preprocess_SA/normalization/"
-            + subject_id
-            + "/w"
-            + subject_id
-            + "_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz"
-        )
-        mni_post = (
-            "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/"
-            + subject_id
-            + "/filter_regressors_bold/"
-            + subject_id
-            + "_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz"
-        )
-        nuisances = (
-            "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/"
-            + subject_id
-            + "/merge_nuisance_txt/all_nuisances.txt"
-        )
-        #        smoothed="/home/mariacabello/wf_workspace/bold_preprocess_SA/smoothing/"+suj+"_ses-01_run-01_rest_bold_ap_MNI-space_smoothing-8mm.nii.gz"
-        command_nuisance = (
-            "fsl_regfilt -i "
-            + mni_pre
-            + " -o "
-            + mni_post
-            + " -d "
-            + nuisances
-            + " -f '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27'"
-        )
+    DVARS quantifies the amount of change in activity from one volume to the next, 
+    across the entire brain and is useful in identifying motion artifacts and 
+    sudden spikes or other anomalies in fMRI.
 
-        os.system(
-            "mkdir -p /home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/"
-            + subject_id
-            + "/filter_regressors_bold"
-        )
-        os.system(command_nuisance)
-    except:
-        with open(root_path + "/nuisance_correction/errors.txt", "a") as f:
-            f.write(
-                str(datetime.datetime.now())
-                + "\t"
-                + subject_id
-                + " did not executed cleanly while Applying nuisance mask\n"
-            )
-        return 0
-
+    Parameters:
+    subject_id (str): Identifier for the subject being processed.
+    """
     print("\n\nFMRI QC\n\n")
     try:
-        os.system("mkdir -p " + root_path + "/QC/" + subject_id)
-        fwd = FramewiseDisplacement()
-        # TODO: You can replace all this with a single input call, like below
+        # Create QC directory
+        qc_dir = os.path.join(root_path, "QC", subject_id)
+        os.makedirs(qc_dir, exist_ok=True)
 
-        # inputs = {
-        #     "in_file": ...,
-        #     "parameter_source": "FSL",
-        #     "out_file": ...,
-        #     "save_plot": True,
-        #     "out_figure": ...
-        # }
-        #
-        # fwd.inputs = inputs
+        # Run framewise displacement
+        fwd_inputs = {
+            "in_file": os.path.join(fmri2standard_path, subject_id, "realign_fmri2SBref",
+                                    f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf.nii.gz.par"),
+            "parameter_source": "FSL",
+            "out_file": os.path.join(qc_dir, "framewise_displ.txt"),
+            "save_plot": True,
+            "out_figure": os.path.join(qc_dir, "framewise_displ.pdf")
+        }
 
-        fwd.inputs.in_file = (
-            root_path
-            + "/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf.nii.gz.par".format(
-                subject_id=subject_id
-            )
-        )
-        fwd.inputs.parameter_source = "FSL"
-        fwd.inputs.out_file = root_path + "/QC/" + subject_id + "/framewise_displ.txt"
-        fwd.inputs.save_plot = True
-        fwd.inputs.out_figure = root_path + "/QC/" + subject_id + "/framewise_displ.pdf"
-        # needs seaborn package to plot
-
+        fwd = FramewiseDisplacement(**fwd_inputs)
         fwd.run()
-
-    except:
-        with open(root_path + "/QC/errors.txt", "a") as f:
-            f.write(
-                str(datetime.datetime.now()) + "\t" + subject_id + " did not executed cleanly while FRAMEWISE_DISPL\n"
-            )
-        return 0
+        
+    except Exception as e:
+        logging.error("Error during framewise displacement for subject %s: %s", subject_id, e)
+        return None
 
     try:
-        input_ = (
-            fmri2standard_path
-            + "/"
-            + subject_id
-            + "/binarize_mask/"
-            + subject_id
-            + "_ses-01_run-01_T1w_brain_bin.nii.gz"
-        )
-        ref = (
-            nuisance_correction_path
-            + "/"
-            + subject_id
-            + "/filter_regressors_bold/"
-            + subject_id
-            + "_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz"
-        )
-        omat = qc_path + "/" + subject_id + "/brain_mask/omat.mat"
-        out = qc_path + "/" + subject_id + "/brain_mask/brain_mask_bin_BOLD_T1.nii.gz"
+        # Set additional paths for QA and brain mask
+        input_ = os.path.join(fmri2standard_path, subject_id, "binarize_mask",
+                              f"{subject_id}_ses-01_run-01_T1w_brain_bin.nii.gz")
+        ref = os.path.join(nuisance_correction_path, subject_id, "filter_regressors_bold",
+                           f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz")
+        omat = os.path.join(qc_dir, "brain_mask", "omat.mat")
+        out = os.path.join(qc_dir, "brain_mask", "brain_mask_bin_BOLD_T1.nii.gz")
 
-        os.system("mkdir " + qc_path + "/" + subject_id + "/brain_mask/")
-
-        os.system("flirt -in " + input_ + " -ref " + ref + " -omat " + omat)
-
-        os.system(
-            "flirt -in "
-            + input_
-            + " -applyxfm -init "
-            + omat
-            + " -out "
-            + out
-            + " -paddingsize 0.0 -interp trilinear -ref "
-            + ref
-        )
-
-    except:
-        with open(root_path + "/QC/errors.txt", "a") as f:
-            f.write(
-                str(datetime.datetime.now()) + "\t" + subject_id + " did not executed cleanly while BRAIN MASK 2 BOLD\n"
-            )
-        return 0
+        os.makedirs(os.path.dirname(omat), exist_ok=True)
+        
+        # Use subprocess to call FSL commands for transformation
+        subprocess.run(["flirt", "-in", input_, "-ref", ref, "-omat", omat], check=True)
+        subprocess.run([
+            "flirt", "-in", input_, "-applyxfm", "-init", omat, "-out", out,
+            "-paddingsize", "0.0", "-interp", "trilinear", "-ref", ref
+        ], check=True)
+    
+    except Exception as e:
+        logging.error("Error in brain mask to BOLD transformation for subject %s: %s", subject_id, e)
+        return None
 
     try:
-        from nipype import Node, Workflow
-        from nipype.interfaces import utility
+        # Setup workflow for DVARS computation
+        wf = Workflow(name=subject_id, base_dir=os.path.join(root_path, "QC"))
 
-        wf = Workflow(name=subject_id, base_dir="/home/mariacabello/wf_workspace/bold_preprocess_SA/QC")
-
-        node_input = Node(utility.IdentityInterface(fields=["bold_T1", "brain_mask"]), name="input_node")
-
+        node_input = Node(
+            utility.IdentityInterface(fields=["bold_T1", "brain_mask"]),
+            name="input_node"
+        )
+        
         node_dvars = Node(ComputeDVARS(save_all=True), name="dvars_node")
 
         wf.connect([
             (node_input, node_dvars, [("bold_T1", "in_file")]),
-            (node_input, node_dvars, [("brain_mask", "in_mask")]),
+            (node_input, node_dvars, [("brain_mask", "in_mask")])
         ])
 
         wf.inputs.input_node.bold_T1 = ref
         wf.inputs.input_node.brain_mask = out
         wf.run()
+        
+    except Exception as e:
+        logging.error("Error in DVARS computation for subject %s: %s", subject_id, e)
+        return None
 
-    except:
-        with open(root_path + "/QC/errors.txt", "a") as f:
-            f.write(str(datetime.datetime.now()) + "\t" + subject_id + " did not executed cleanly while DVARS\n")
-        return 0
-
-    # REMOVE recon AND bids
-
-    os.system("rm -r " + root_path + "/" + heudiconv_folder + "/" + subject_id)
-    os.system("rm -r " + recon_all_path + "/" + subject_id)
-
-    return 1
-
+    # Cleanup directories
+    shutil.rmtree(os.path.join(root_path, heudiconv_folder, subject_id), ignore_errors=True)
+    shutil.rmtree(os.path.join(recon_all_path, subject_id), ignore_errors=True)
 
 def check_error(suj, error_file):
-    with open(error_file, "r") as f:
-        text = f.readlines()
-    return sum([suj in line for line in text]) > 0
+    """
+    Check if a subject id is present in the error file.
 
+    Parameters:
+    suj (str): The subject identifier to search for in the file.
+    error_file (str): The path to the error log file.
 
-## RUNNING PREPROCESSING
+    Returns:
+    bool: True if the identifier is found in the file, False otherwise.
+    """
+    try:
+        with open(error_file, "r") as f:
+            for line in f:
+                if suj in line:
+                    return True
+        return False
+    except IOError as e:
+        logging.error("Error opening or reading file %s: %s", error_file, e)
+        return False
 
-todo = os.listdir("/institut/UB/Superagers/MRI/BIDS")
+def initialize_preprocessing_dirs(bids_dir, done_dir):
+    """
+    Initialize directories and retrieve the list of subjects to process.
 
-done = []  # os.listdir('/institut/BBHI/MRI/processed_data/fMRI-preprocessed_tp2')
-todo = list(set(todo).difference(done))
-todo.remove(".heudiconv")
-todo.remove("error_heurdiconv.sh")
-# todo=done
-dict_done = dict()
-for id_ in todo:
-    # bold native
-    bold_native = os.path.exists(
-        "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/"
-        + id_
-        + "/filter_regressors_bold/"
-        + id_
-        + "_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz"
-    )
+    Parameters:
+        bids_dir (str): Directory containing the BIDS datasets.
+        done_dir (str): Directory containing already processed data.
 
-    # sbref native
-    sbref_native = os.path.exists(
-        "/home/mariacabello/wf_workspace/bold_preprocess_SA/fmri2standard/"
-        + id_
-        + "/spm_coregister2T1_sbref/"
-        + id_
-        + "_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz"
-    )
+    Returns:
+        set: A set containing identifiers of subjects yet to be processed.
+    """
+    todo = set(os.listdir(bids_dir))
+    done = set()  # Assuming done_dir contains list of processed subjects
 
-    # bold MNI
-    bold_MNI = os.path.exists(
-        "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/"
-        + id_
-        + "/filter_regressors_bold/"
-        + id_
-        + "_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz"
-    )
+    todo -= done
+    todo.discard(".heudiconv")
+    todo.discard("error_heurdiconv.sh")
 
-    # sbref MNI
-    sbref_MNI = os.path.exists(
-        "/home/mariacabello/wf_workspace/bold_preprocess_SA/normalization/"
-        + id_
-        + "/w"
-        + id_
-        + "_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii"
-    ) or os.path.exists(
-        "/home/mariacabello/wf_workspace/bold_preprocess_SA/normalization/"
-        + id_
-        + "/w"
-        + id_
-        + "_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz"
-    )
+    return todo
 
-    # motion
-    motion = os.path.exists(
-        "/home/mariacabello/wf_workspace/bold_preprocess_SA/fmri2standard/"
-        + id_
-        + "/realign_fmri2SBref/"
-        + id_
-        + "_ses-01_run-01_rest_bold_ap_roi_mcf.nii.gz.par"
-    )
-    # nuisance regressors
-    nuisance = os.path.exists(
-        "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/"
-        + id_
-        + "/merge_nuisance_txt/all_nuisances.txt"
-    )
-    # framewise displ
-    framew = os.path.exists("/home/mariacabello/wf_workspace/bold_preprocess_SA/QC/" + id_ + "/framewise_displ.txt")
+def check_preprocessing_files(subject_id):
+    """
+    Check if required preprocessing files and outputs exist for a subject.
 
-    dict_done[id_] = [motion, nuisance, bold_native, sbref_native, bold_MNI, sbref_MNI, framew]
+    Parameters:
+        subject_id (str): Identifier for the subject to check.
 
+    Returns:
+        dict: A dictionary indicating the presence of key processing files
+              with boolean values.
+    """
+    workspace_dir = "/home/mariacabello/wf_workspace/bold_preprocess_SA"
 
-dict_n_done = dict()
-for id_ in dict_done:
-    dict_n_done[id_] = sum(dict_done[id_])
+    paths_to_check = {
+        "bold_native": os.path.join(workspace_dir, "nuisance_correction", subject_id, "filter_regressors_bold",
+                                    f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz"),
+        "sbref_native": os.path.join(workspace_dir, "fmri2standard", subject_id, "spm_coregister2T1_sbref",
+                                     f"{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz"),
+        "bold_mni": os.path.join(workspace_dir, "nuisance_correction", subject_id, "filter_regressors_bold",
+                                 f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz"),
+        "sbref_mni": [
+            os.path.join(workspace_dir, "normalization", subject_id,
+                         f"w{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii"),
+            os.path.join(workspace_dir, "normalization", subject_id,
+                         f"w{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz")
+        ],
+        "motion": os.path.join(workspace_dir, "fmri2standard", subject_id, "realign_fmri2SBref",
+                               f"{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf.nii.gz.par"),
+        "nuisance": os.path.join(workspace_dir, "nuisance_correction", subject_id, "merge_nuisance_txt", "all_nuisances.txt"),
+        "framew": os.path.join(workspace_dir, "QC", subject_id, "framewise_displ.txt")
+    }
 
+    return {key: (any(os.path.exists(path) for path in value) if isinstance(value, list) else os.path.exists(value))
+            for key, value in paths_to_check.items()}
 
-with open("/home/mariacabello/wf_workspace/bold_preprocess_SA/move.txt", "w") as f:
-    for id_ in done:
-        f.write(id_ + " ")
+def process_subjects(todo):
+    """
+    Process each subject and identify subjects requiring reprocessing.
 
+    Parameters:
+        todo (set): Set of subject identifiers to process.
 
-tofix = [id_ for id_ in dict_done if dict_done[id_][:4] == [True, True, False, True]]
+    Returns:
+        tuple: A tuple containing dictionaries of subject processing statuses,
+               a dictionary of the count of completed processes, and a list of 
+               subjects needing preparation ('no_pre').
+    """
+    dict_done = {subject_id: check_preprocessing_files(subject_id) for subject_id in todo}
+    dict_n_done = {subject_id: sum(status.values()) for subject_id, status in dict_done.items()}
 
+    # Identify subjects needing additional work based on incomplete stages
+    tofix = [subject_id for subject_id, status in dict_done.items() if status["motion"] and status["nuisance"]
+             and not status["bold_native"] and status["sbref_native"]]
 
-i = 0
-nopre = []
-for id_ in tofix:
-    print(str(i) + ": " + str(id_))
-    i = i + 1
-    nuisances = (
-        "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/"
-        + id_
-        + "/merge_nuisance_txt/all_nuisances.txt"
-    )
-    pre = (
-        "/home/mariacabello/wf_workspace/bold_preprocess_SA/fmri2standard/"
-        + id_
-        + "/spm_coregister2T1_bold/"
-        + id_
-        + "_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz"
-    )
-    post = (
-        "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/"
-        + id_
-        + "/filter_regressors_bold/"
-        + id_
-        + "_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz"
-    )
-    if os.path.exists(pre) and not os.path.exists(post):
-        os.system(
-            "fsl_regfilt -i "
-            + pre
-            + " -o "
-            + post
-            + " -d "
-            + nuisances
-            + " -f '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27'"
-        )
-    elif not os.path.exists(pre):
-        nopre.append(id_)
-        print("NO PRE")
-    else:
-        print("POST ALREADY")
+    no_pre = []
+    for subject_id in tofix:
+        print(f"Subject {subject_id} needs additional processing.")
+        nuisances = dict_done[subject_id]['nuisance']
+        pre = dict_done[subject_id]['bold_native']
+        post = dict_done[subject_id]['bold_native']
+        
+        if os.path.exists(pre) and not os.path.exists(post):
+            subprocess.run(
+                f"fsl_regfilt -i {pre} -o {post} -d {nuisances} "
+                "-f '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27'",
+                shell=True, check=True
+            )
+        elif not os.path.exists(pre):
+            no_pre.append(subject_id)
+            print("No previous data for Subject", subject_id)
+        else:
+            print("Post-processing already exists for Subject", subject_id)
 
+    return dict_done, dict_n_done, no_pre
 
-# TODO if you want to run these parts not exactly in order, you can run these parts in a jupyter notebook.
-# TODO. I'd suggest having a main script that calls all these functions in order, and a jupyter notebook where you can
-# TODO. run the parts you want to run out of order if you  want to
-todo = [s for s in dict_done if dict_n_done[s] == 0]
-##########
-# PART 1 #   fmri2std
-##########
+# Define paths to key directories
+bids_directory = "/institut/UB/Superagers/MRI/BIDS"  
+processed_directory = '/institut/BBHI/MRI/processed_data/fMRI-preprocessed_tp2' 
 
-# nypipe controls if it has been already done or not
-pool = Pool(6)  # Create a multiprocessing Pool
-pool.map(execute_preprocessing_part1, todo)  # process list_subjs iterable with pool
-# uncomment
-# for suj in todo:
-#    execute_preprocessing_part1(suj)
+# Initialize the preprocessing workflow by identifying subjects to process
+subjects_to_process = initialize_preprocessing_dirs(bids_directory, processed_directory)
 
+# Process subject data to track the completion statuses and identify setups for reprocessing
+processed_status, completed_tasks, subjects_needing_setup = process_subjects(subjects_to_process)
 
-##########
-# PART 2 #   SPM coregistration
-##########
+# Set up a multiprocessing pool to parallelize fMRI standard space transformation
+pool = Pool(6)
+pool.map(transform_fmri_to_standard, subjects_to_process)
 
-# needs to subset the list to not repeat the computation
-
-new_list_todo_part2 = [
-    id_
-    for id_ in todo
-    if not check_error(id_, "/home/mariacabello/wf_workspace/bold_preprocess_SA/fmri2standard/errors.txt")
+# Filter subject list for the coregistration step, excluding those with known errors
+coregistration_needed = [
+    subject_id for subject_id in subjects_to_process
+    if not check_error(subject_id, os.path.join(workspace_dir, "fmri2standard", "errors.txt"))
 ]
 
-# new_list_todo_part2=[id_ for id_ in new_list_todo_part2 if not os.path.exists("/home/mariacabello/wf_workspace/bold_preprocess_SA/fmri2standard/"+id_+"/spm_coregister2T1_sbref/"+id_+"_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz") and
-#                     not os.path.exists("/home/mariacabello/wf_workspace/bold_preprocess_SA/fmri2standard/"+id_+"/spm_coregister2T1_bold/"+id_+"_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz")]
+# Perform coregistration on the filtered list of subjects
+for subject in coregistration_needed:
+    execute_coregistration(subject)
 
-# uncomment
-for suj in new_list_todo_part2:
-    execute_preprocessing_part2(suj)
-
-
-##########
-# PART 3 #   nuisance correction (1)
-##########
-
-# nypipe controls if it has been already done or not
-
-new_list_todo_part3 = [
-    id_
-    for id_ in todo
-    if not check_error(id_, "/home/mariacabello/wf_workspace/bold_preprocess_SA/fmri2standard/errors.txt")
-]
-# new_list_todo_part3=[id_ for id_ in new_list_todo_part2 if not check_error(id_,"/home/mariacabello/wf_workspace/bold_preprocess_SA/fmri2standard/errors.txt")]
-
-
-todo_part3_1 = new_list_todo_part3
-# todo_part3_1=[id_ for id_ in new_list_todo_part3 if not len(os.listdir("/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/"+id_+"/masks_csf_wm"))>8]
-
-# uncomment
-pool = Pool(6)  # Create a multiprocessing Pool
-pool.map(execute_preprocessing_part3_1, todo_part3_1)  # process list_subjs iterable with pool
-
-# for suj in todo_part3_1:
-#    execute_preprocessing_part3_1(suj)
-
-
-# todo_part3_2=[id_ for id_ in todo_part3_1 if not check_error(id_,"/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/errors_wmcsfextraction.txt")]
-todo_part3_2 = [
-    id_
-    for id_ in new_list_todo_part3
-    if not check_error(
-        id_, "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/errors_wmcsfextraction.txt"
-    )
+# Filter and assign subjects for nuisance correction, ensuring no prior errors
+nuisance_step1_list = [
+    subject_id for subject_id in subjects_to_process
+    if not check_error(subject_id, os.path.join(workspace_dir, "fmri2standard", "errors.txt"))
 ]
 
-# uncomment
-for suj in todo_part3_2:
-    execute_preprocessing_part3_2(suj)
+# Apply nuisance correction for initial step and utilize multiprocessing
+pool.map(extract_wm_csf_masks, nuisance_step1_list)
 
-
-todo_part3_2 = [
-    id_
-    for id_ in todo_part3_2
-    if not check_error(
-        id_, "/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/errors_nuisancewf.txt"
-    )
+# Further filter subjects for advanced nuisance regression
+nuisance_step2_list = [
+    subject_id for subject_id in nuisance_step1_list
+    if not check_error(subject_id, os.path.join(workspace_dir, "nuisance_correction", "errors_wmcsfextraction.txt"))
 ]
 
-# this part is for glasser-timeseries extraction
-# pool = Pool(6)                         # Create a multiprocessing Pool
-# pool.map(execute_preprocessing_part3_3, todo_part3_2)  # process list_subjs iterable with pool
+# Execute advanced nuisance regression
+for subject in nuisance_step2_list:
+    run_nuisance_regression(subject)
 
+# Proceed with SPM normalization on subjects that completed previous steps without errors
+normalization_needed = nuisance_step2_list
+for subject in normalization_needed:
+    mni_normalization(subject)
 
-##########
-# PART 4 #   SPM normalization
-##########
-
-todo_part4 = todo_part3_2
-
-
-# list_subjs_part4=[id_ for id_ in list_subjs_todo if not os.path.exists(root_path+'/normalization/{subject_id}/{subject_id}_ses-01_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii'.format(subject_id=id_)) and not os.path.exists(root_path+'/normalization/{subject_id}/{subject_id}_ses-01_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii'.format(subject_id=id_))]
-
-# uncomment
-for suj in todo_part4:
-    execute_preprocessing_part4(suj)
-
-
-##########
-# PART 5 #   nuisance MNI and QC
-##########
-
-todo_part5 = [
-    id_
-    for id_ in todo_part4
-    if not check_error(id_, "/home/mariacabello/wf_workspace/bold_preprocess_SA/normalization/errors.txt")
+# Finalize processing by applying nuisance correction and quality control checks
+final_qc_subjects = [
+    subject_id for subject_id in normalization_needed
+    if not check_error(subject_id, os.path.join(workspace_dir, "normalization", "errors.txt"))
 ]
 
-pool = Pool(8)  # Create a multiprocessing Pool
-pool.map(execute_preprocessing_part5, todo_part5)  # process list_subjs iterable with pool
+# Set up a new multiprocessing pool for final QC and correction
+pool = Pool(8)
+pool.map(apply_nuisance_correction, final_qc_subjects)
 
-# for suj in todo_part5:
-#    execute_preprocessing_part5(suj)
+def main():
+    # Setup logging to file and console
+    logging.basicConfig(level=logging.INFO, filename="logs.log", filemode='w',
+                        format='%(asctime)s - %(levelname)s - %(message)s')
+
+    # Define root path for preprocessing workspace
+    root_path = '/home/mariacabello/wf_workspace/bold_preprocess_SA'
+
+    # Define folder names
+    heudiconv_folder = 'func_anat'
+    fmri2standard_folder = 'fmri2standard'
+
+    # Construct full paths using os.path.join for better readability and cross-platform compatibility
+    source_dir = os.path.join("/institut/UB/Superagers/MRI/freesurfer-reconall")
+    recon_all_path = os.path.join(root_path, 'recon_all')
+    bids_path = os.path.join(root_path, heudiconv_folder)
+    current_script_dir = os.path.dirname(os.path.abspath(__file__))
+    fmri2standard_path = os.path.join(root_path, fmri2standard_folder)
+    nuisance_correction_path = os.path.join(root_path, 'nuisance_correction')
+    qc_path = os.path.join(root_path, 'QC')
+
+    # Initialize preprocessing directories and handle subjects
+    bids_directory = "/institut/UB/Superagers/MRI/BIDS"  
+    processed_directory = '/institut/BBHI/MRI/processed_data/fMRI-preprocessed_tp2' 
+    subjects_to_process = initialize_preprocessing_dirs(bids_directory, processed_directory)
+
+    processed_status, completed_tasks, subjects_needing_setup = process_subjects(subjects_to_process)
+
+    # Define the SPM coregistration object for aligning EPI to T1
+    coreg_EPI2T1 = spm.Coregister()
+
+    # Run the preprocessing workflows
+    run_workflows(bids_path, fmri2standard_path, nuisance_correction_path, recon_all_path, qc_path)
+
+    # Parallel processing for workflows
+    with Pool(6) as pool:
+        pool.map(transform_fmri_to_standard, subjects_to_process)
+
+        coregistration_needed = [
+            subject_id for subject_id in subjects_to_process
+            if not check_error(subject_id, os.path.join(fmri2standard_path, "errors.txt"))
+        ]
+        for subject in coregistration_needed:
+            execute_coregistration(subject)
+
+        nuisance_step1_list = [
+            subject_id for subject_id in subjects_to_process
+            if not check_error(subject_id, os.path.join(fmri2standard_path, "errors.txt"))
+        ]
+        pool.map(extract_wm_csf_masks, nuisance_step1_list)
+
+        # More processing steps abstracted similarly...
+
+    final_qc_subjects = [
+        subject_id for subject_id in normalization_needed
+        if not check_error(subject_id, os.path.join(qc_path, "errors.txt"))
+    ]
+
+    with Pool(8) as pool:
+        pool.map(apply_nuisance_correction, final_qc_subjects)
+
+if __name__ == "__main__":
+    main()
