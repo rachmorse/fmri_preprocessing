@@ -102,4 +102,3 @@ else
   echo "Error! Unknow mode after flag -m --mode. Possible values are: 'to_nii' or 'to_nii_gz'"
   exit 1
 fi
-
