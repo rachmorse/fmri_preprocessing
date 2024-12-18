@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 """This script executes fMRI preprocessing workflows with configurable paths."""
 
-import datetime
 import gzip
 import logging
 import os
 import shutil
 import subprocess
 from multiprocessing import Pool
+from functools import partial
+from pathlib import Path
 
 # NOTE this is supposed to be needed for the QC framewise displacement figure. Check that this is correct
 # Custom workflow imports
@@ -19,6 +20,7 @@ from nipype import Node, Workflow
 # Nipype interfaces
 from nipype.algorithms.confounds import ComputeDVARS, FramewiseDisplacement
 from nipype.interfaces import spm, utility
+from nipype.interfaces.utility import IdentityInterface
 
 # def prepare_data(subject_id, recon_all_path, source_dir):
 #     """
@@ -56,7 +58,7 @@ from nipype.interfaces import spm, utility
 #         logging.error("Error copying aseg.mgz & brain.mgz for subject %s: %s", subject_id, e)
 
 
-def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path, current_script_dir, write_graph=False):
+def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path, acparams_file, write_graph=False):
     """Transform fMRI data to a standard space for a given subject.
 
     This function sets up and runs a workflow to align fMRI data to standard
@@ -69,7 +71,7 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
     root_path (str): The root path for the preprocessing workspace.
     bids_path (str): The path to the shared BIDS folder.
     recon_all_path (str): The path to the recon_all directory.
-    current_script_dir (str): The directory where this script is located.
+    acparams_file (str): The path to the acparams.txt file.
     """
     print("##################################################")
     print(f"Processing subject: {subject_id}")
@@ -82,23 +84,21 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
     try:
         # Define the workflow to get the acparams file
         fmri2t1_wf = get_fmri2standard_wf(
-            [10, 750],  # [10, 750] correspond to the first and last volumes with the first 10 removed
-            subject_id,
-            os.path.join(current_script_dir, "../../acparams_hcp.txt"),
+            [10, 750], # [10, 750] correspond to the first and last volumes with the first 10 removed
+            subject_id, 
+            acparams_file
         )
 
         # Set the base directory for the workflow
         fmri2t1_wf.base_dir = os.path.join(root_path, "fmri2standard")
 
-        # Set necessary inputs
-        fmri2t1_wf.inputs.input_node = {
-            "T1_img": f"{bids_path}/{subject_id}/ses-02/anat/{subject_id}_ses-02_run-01_T1w.nii.gz",
-            "func_bold_ap_img": f"{bids_path}/{subject_id}/ses-02/func/{subject_id}_ses-02_run-01_rest_bold_ap.nii.gz",
-            "func_sbref_img": f"{bids_path}/{subject_id}/ses-02/func/{subject_id}_ses-02_run-01_rest_sbref_ap.nii.gz",
-            "func_segfm_ap_img": f"{bids_path}/{subject_id}/ses-02/func/{subject_id}_ses-02_run-01_rest_sefm_ap.nii.gz",
-            "func_segfm_pa_img": f"{bids_path}/{subject_id}/ses-02/func/{subject_id}_ses-02_run-01_rest_sefm_pa.nii.gz",
-            "T1_brain_freesurfer_mask": f"{recon_all_path}/{subject_id}/mri/brain.mgz",
-        }
+        # Directly set inputs like the working code does
+        fmri2t1_wf.inputs.input_node.T1_img = f"{bids_path}/{subject_id}/ses-02/anat/{subject_id}_ses-02_run-01_T1w.nii.gz"
+        fmri2t1_wf.inputs.input_node.func_bold_ap_img = f"{bids_path}/{subject_id}/ses-02/func/{subject_id}_ses-02_task-rest_dir-ap_run-01_bold.nii.gz"
+        fmri2t1_wf.inputs.input_node.func_sbref_img = f"{bids_path}/{subject_id}/ses-02/func/{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref.nii.gz"
+        fmri2t1_wf.inputs.input_node.func_segfm_ap_img = f"{bids_path}/{subject_id}/ses-02/fmap/{subject_id}_ses-02_acq-restsefm_dir-ap_run-01_epi.nii.gz"
+        fmri2t1_wf.inputs.input_node.func_segfm_pa_img = f"{bids_path}/{subject_id}/ses-02/fmap/{subject_id}_ses-02_acq-restsefm_dir-pa_run-01_epi.nii.gz"
+        fmri2t1_wf.inputs.input_node.T1_brain_freesurfer_mask = f"{recon_all_path}/{subject_id}_ses-02/mri/brain.mgz"
 
         if write_graph:
             fmri2t1_wf.write_graph()
@@ -109,9 +109,8 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
     except Exception as e:
         logging.error("Error in fMRI to Standard Workflow for subject %s: %s", subject_id, e)
         return None
-
-
-def execute_coregistration(subject_id, root_path, fmri2standard_folder, heudiconv_folder, coreg_EPI2T1):
+    
+def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1):
     """Perform coregistration of BOLD images to standard T1 for a given subject.
 
     This function converts intermediate files using a script, sets input paths,
@@ -121,7 +120,7 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, heudicon
     subject_id (str): The identifier for the subject being processed.
     root_path (str): The root path for preprocessing.
     fmri2standard_folder (str): Directory within root_path to store fMRI to standard transformations.
-    heudiconv_folder (str): Directory within root_path to store heuristic DICOM conversions.
+    bids_path (str): Directory for BIDS data.
     coreg_EPT2T1 (spm.Coregister): The coregistration object for aligning BOLD to T1.
     """
     try:
@@ -135,7 +134,7 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, heudicon
                 "-f",
                 fmri2standard_folder,
                 "-b",
-                heudiconv_folder,
+                bids_path,
                 "-s",
                 subject_id,
                 "-m",
@@ -162,7 +161,7 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, heudicon
 
         # SPM coregistration: Align BOLD to standard T1
         target_path = os.path.join(
-            root_path, heudiconv_folder, subject_id, "ses-02", "anat", f"{subject_id}_ses-02_run-01_T1w.nii"
+            root_path, bids_path, subject_id, "ses-02", "anat", f"{subject_id}_ses-02_run-01_T1w.nii"
         )
         coreg_EPI2T1.inputs.target = target_path
         coreg_EPI2T1.inputs.source = sbref2T1_path
@@ -181,7 +180,7 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, heudicon
                 "-f",
                 fmri2standard_folder,
                 "-b",
-                heudiconv_folder,
+                bids_path,
                 "-s",
                 subject_id,
                 "-m",
@@ -192,9 +191,7 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, heudicon
 
     except Exception as e:
         logging.error("Error during SPM coregistration for subject %s: %s", subject_id, e)
-        with open(os.path.join(root_path, "fmri2standard", "errors.txt"), "a") as f:
-            f.write(f"{datetime.now()}\t{subject_id} did not execute cleanly during SPM coregistration\n")
-
+        return None
 
 def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_path):
     """Extract white matter (WM) and cerebrospinal fluid (CSF) masks for nuisance correction.
@@ -385,10 +382,7 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
 
         # Copy and decompress sbref image
         shutil.copy(sbref_niigz, sbref_niigzcopy)
-        with (
-            gzip.open(sbref_niigzcopy, "rb") as f_in,
-            open(sbref_nii, "wb") as f_out,
-        ):  # Write decompressed sbref image as .nii
+        with gzip.open(sbref_niigzcopy, "rb") as f_in, open(sbref_nii, "wb") as f_out: # Write decompressed sbref image as .nii
             shutil.copyfileobj(f_in, f_out)  # Copy decompressed sbref image
 
         # Perform MNI normalization
@@ -497,7 +491,7 @@ def apply_nuisance_correction(subject_id, root_path):
 
 
 def fmri_quality_control(
-    subject_id, root_path, fmri2standard_path, nuisance_correction_path, heudiconv_folder, recon_all_path
+    subject_id, root_path, fmri2standard_path, nuisance_correction_path, bids_path, recon_all_path
 ):
     """Perform fMRI quality control for a given subject.
 
@@ -513,7 +507,7 @@ def fmri_quality_control(
     root_path (str): The root path for data storage.
     fmri2standard_path (str): The path to the fMRI to standard transformations.
     nuisance_correction_path (str): The path to the nuisance correction data.
-    heudiconv_folder (str): The directory for heuristic DICOM conversions.
+    bids_path (str): The directory for BIDS data.
     recon_all_path (str): The path to the recon_all directory.
     qc_dir (str): The directory for storing quality control data.
     input_ (str): The path to the brain mask in BOLD space.
@@ -612,7 +606,7 @@ def fmri_quality_control(
         return None
 
     # Cleanup directories
-    shutil.rmtree(os.path.join(root_path, heudiconv_folder, subject_id), ignore_errors=True)
+    shutil.rmtree(os.path.join(root_path, bids_path, subject_id), ignore_errors=True)
     shutil.rmtree(os.path.join(recon_all_path, subject_id), ignore_errors=True)
 
 
@@ -629,9 +623,9 @@ def initialize_preprocessing_dirs(bids_dir, processed_directory):
         set: A set containing identifiers of subjects yet to be processed.
     """
     subjects_to_process = set(os.listdir(bids_dir))
-    done = os.path.join(processed_directory)
+    done = set(os.listdir(processed_directory))  
 
-    subjects_to_process -= done
+    subjects_to_process -= done  # Subtract processed subjects
     subjects_to_process.discard(".heudiconv")
     subjects_to_process.discard("error_heurdiconv.sh")
 
@@ -700,19 +694,19 @@ def main():
     )
 
     # Define all paths and directories for the preprocessing workflow
-    root_path = "/home/rachel/Preprocessing"
-    heudiconv_folder = "func_anat"
+    root_path = "/home/rachel/Desktop/Preprocessing"
     fmri2standard_folder = "fmri2standard"
-    source_dir = os.path.join("/Institut copy/UB/Superagers/MRI/freesurfer-reconall")
-    recon_all_path = os.path.join(root_path, "recon_all")
-    bids_path = os.path.join(root_path, heudiconv_folder)
-    current_script_dir = os.path.dirname(os.path.abspath(__file__))
+    source_dir = os.path.join("/home/rachel/Desktop/institute/UB/Superagers/MRI/freesurfer-reconall")
+    mri_path = "/home/rachel/Desktop/institute/UB/Superagers/MRI"
+    bids_path = os.path.join(mri_path, "BIDS")
+    recon_all_path = os.path.join(mri_path, "freesurfer-reconall")
+    acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
     fmri2standard_path = os.path.join(root_path, fmri2standard_folder)
     nuisance_correction_path = os.path.join(root_path, "nuisance_correction")
     qc_path = os.path.join(root_path, "QC")
-    bids_dir = "/Institut copy/UB/Superagers/MRI/BIDS"
-    processed_directory = "/Institut copy/UB/Superagers/MRI/processed_data/fMRI-preprocessed_tp2"
-    log_file_path = os.path.join(root_path, "logs.log")
+    bids_dir = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
+    processed_directory = "/home/rachel/Desktop/institute/UB/Superagers/MRI/processed_data/fMRI-preprocessed_tp2"
+    log_file_path = "/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/src/preprocessing/logs.log"
 
     # Define the SPM coregistration object
     coreg_EPI2T1 = spm.Coregister()
@@ -723,9 +717,18 @@ def main():
     #### Run the preprocessing workflow ####
 
     # Step 1.
+    # Define the partial function with fixed arguments
+    transform_partial_fmri_to_standard = partial(
+        transform_fmri_to_standard,
+        root_path=root_path,
+        bids_path=bids_path,
+        recon_all_path=recon_all_path,
+        acparams_file=acparams_file
+    )
+
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation (`transform_fmri_to_standard`)
     with Pool(6) as pool:
-        pool.map(transform_fmri_to_standard, subjects_to_process)
+        pool.map(transform_partial_fmri_to_standard, subjects_to_process)
 
     # Step 2.
     # Identify subjects needing coregistration to run (`execute_coregistration`), excluding those with errors from `transform_fmri_to_standard`
@@ -738,7 +741,13 @@ def main():
 
     # Perform coregistration on the filtered list of subjects
     for subject in coregistration_list:
-        execute_coregistration(subject)
+        execute_coregistration(
+            subject,
+            root_path,
+            fmri2standard_folder,
+            bids_path,
+            coreg_EPI2T1
+        )
 
     # Step 3a.
     # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
@@ -750,7 +759,14 @@ def main():
     ]
 
     # Apply nuisance correction initial step using multiprocessing
-    pool.map(extract_wm_csf_masks, extract_wm_csf_masks_list)
+    transform_partial_extract_wm_csf_masks = partial(
+        extract_wm_csf_masks,
+        root_path=root_path,
+        fmri2standard_folder=fmri2standard_folder,
+        recon_all_path=recon_all_path
+    )
+
+    pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
     # Step 3b.
     # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
@@ -763,7 +779,10 @@ def main():
 
     # Execute advanced nuisance regression
     for subject in nuisance_regression_list:
-        run_nuisance_regression(subject)
+        run_nuisance_regression(
+            subject,
+            root_path
+        )
 
     # Step 4.
     # Identify subjects needing MNI normalization to run (`mni_normalization`), excluding those with errors from `run_nuisance_regression`
@@ -776,7 +795,12 @@ def main():
 
     # Perform MNI normalization using multiprocessing
     for subject in mni_normalization_list:
-        mni_normalization(subject)
+        mni_normalization(
+            subject,
+            root_path,
+            bids_path,
+            fmri2standard_path
+        )
 
     # Step 5.
     # Identify subjects needing nuisance regression removal to run (`apply_nuisance_correction`), excluding those with errors from `mni_normalization`
@@ -787,8 +811,13 @@ def main():
 
     ###### NOTE because I divided step 5 into two parts, ask Maria if both of these parts require parallelization. Remove if not needed
     # Apply nuisance correction using multiprocessing
+    transform_partial_apply_nuisance_correction = partial(
+        apply_nuisance_correction,
+        root_path=root_path
+    )
+    
     with Pool(8) as pool:
-        pool.map(apply_nuisance_correction, regression_list)
+        pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
     # Step 6.
     # Identify subjects needing fMRI quality control to run (`fmri_quality_control`), excluding those with errors from `apply_nuisance_correction`
@@ -798,8 +827,17 @@ def main():
     qc_list = [subject_id for subject_id in subjects_to_process if subject_id not in subjects_with_regression_errors]
 
     # Perform fMRI quality control using multiprocessing
+    transform_partial_fmri_quality_control = partial(
+        fmri_quality_control,
+        root_path=root_path,
+        fmri2standard_path=fmri2standard_path,
+        nuisance_correction_path=nuisance_correction_path,
+        bids_path=bids_path,
+        recon_all_path=recon_all_path
+    )
+
     with Pool(8) as pool:
-        pool.map(fmri_quality_control, qc_list)
+        pool.map(transform_partial_fmri_quality_control, qc_list)
 
 
 if __name__ == "__main__":
