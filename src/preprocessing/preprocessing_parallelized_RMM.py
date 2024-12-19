@@ -737,32 +737,33 @@ def main():
 
     #### Run the preprocessing workflow ####
 
-    # Step 1.
-    # Setup logging for fMRI to standard transformation
-    setup_logging("transform_fmri_to_standard")
+    # # Step 1.
+    # # Setup logging for fMRI to standard transformation
+    # setup_logging("transform_fmri_to_standard")
 
-    # Define the partial function with fixed arguments
-    transform_partial_fmri_to_standard = partial(
-        transform_fmri_to_standard,
-        root_path=root_path,
-        bids_path=bids_path,
-        recon_all_path=recon_all_path,
-        acparams_file=acparams_file,
-    )
+    # # Define the partial function with fixed arguments
+    # transform_partial_fmri_to_standard = partial(
+    #     transform_fmri_to_standard,
+    #     root_path=root_path,
+    #     bids_path=bids_path,
+    #     recon_all_path=recon_all_path,
+    #     acparams_file=acparams_file,
+    # )
 
-    # Set up a multiprocessing pool to parallelize fMRI standard space transformation (`transform_fmri_to_standard`)
-    with Pool(6) as pool:
-        results = pool.map(transform_partial_fmri_to_standard, subjects_to_process)  # Store results in a variable
+    # # Set up a multiprocessing pool to parallelize fMRI standard space transformation (`transform_fmri_to_standard`)
+    # with Pool(6) as pool:
+    #     results = pool.map(transform_partial_fmri_to_standard, subjects_to_process)  # Store results in a variable
 
-    # Identify subjects ready for coregistration to run (`execute_coregistration`), excluding those with errors from `transform_fmri_to_standard`
-    coregistration_list = [subject for sublist in results for subject in sublist]
+    # # Identify subjects ready for coregistration to run (`execute_coregistration`), excluding those with errors from `transform_fmri_to_standard`
+    # coregistration_list = [subject for sublist in results for subject in sublist]
 
     # Step 2.
     # Setup logging for coregistration
     setup_logging("execute_coregistration")
 
+###### CHAGNE SUBS TO PROCESS BACK TO LIST WHEN UNCOMMENTING 
     # Perform coregistration on the filtered list of subjects
-    for subject in coregistration_list:
+    for subject in subjects_to_process:
         results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
 
     # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
