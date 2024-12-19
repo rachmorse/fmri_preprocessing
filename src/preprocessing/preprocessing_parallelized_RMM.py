@@ -7,8 +7,8 @@ import logging
 import os
 import shutil
 import subprocess
-from multiprocessing import Pool
 from functools import partial
+from multiprocessing import Pool
 from pathlib import Path
 
 # NOTE this is supposed to be needed for the QC framewise displacement figure. Check that this is correct
@@ -20,7 +20,6 @@ from nipype import Node, Workflow
 # Nipype interfaces
 from nipype.algorithms.confounds import ComputeDVARS, FramewiseDisplacement
 from nipype.interfaces import spm, utility
-from nipype.interfaces.utility import IdentityInterface
 
 # def prepare_data(subject_id, recon_all_path, source_dir):
 #     """
@@ -72,6 +71,7 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
     bids_path (str): The path to the shared BIDS folder.
     recon_all_path (str): The path to the recon_all directory.
     acparams_file (str): The path to the acparams.txt file.
+    completed_subjects (list): List of subjects that have completed the transformation.
     """
     print("##################################################")
     print(f"Processing subject: {subject_id}")
@@ -79,25 +79,37 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
 
     # prepare_data(subject_id)
 
+    completed_subjects = []
+
     print("\n\\FMRI TO STANDARD\n\n")
 
     try:
         # Define the workflow to get the acparams file
         fmri2t1_wf = get_fmri2standard_wf(
-            [10, 750], # [10, 750] correspond to the first and last volumes with the first 10 removed
-            subject_id, 
-            acparams_file
+            [10, 750],  # [10, 750] correspond to the first and last volumes with the first 10 removed
+            subject_id,
+            acparams_file,
         )
 
         # Set the base directory for the workflow
         fmri2t1_wf.base_dir = os.path.join(root_path, "fmri2standard")
 
         # Directly set inputs like the working code does
-        fmri2t1_wf.inputs.input_node.T1_img = f"{bids_path}/{subject_id}/ses-02/anat/{subject_id}_ses-02_run-01_T1w.nii.gz"
-        fmri2t1_wf.inputs.input_node.func_bold_ap_img = f"{bids_path}/{subject_id}/ses-02/func/{subject_id}_ses-02_task-rest_dir-ap_run-01_bold.nii.gz"
-        fmri2t1_wf.inputs.input_node.func_sbref_img = f"{bids_path}/{subject_id}/ses-02/func/{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref.nii.gz"
-        fmri2t1_wf.inputs.input_node.func_segfm_ap_img = f"{bids_path}/{subject_id}/ses-02/fmap/{subject_id}_ses-02_acq-restsefm_dir-ap_run-01_epi.nii.gz"
-        fmri2t1_wf.inputs.input_node.func_segfm_pa_img = f"{bids_path}/{subject_id}/ses-02/fmap/{subject_id}_ses-02_acq-restsefm_dir-pa_run-01_epi.nii.gz"
+        fmri2t1_wf.inputs.input_node.T1_img = (
+            f"{bids_path}/{subject_id}/ses-02/anat/{subject_id}_ses-02_run-01_T1w.nii.gz"
+        )
+        fmri2t1_wf.inputs.input_node.func_bold_ap_img = (
+            f"{bids_path}/{subject_id}/ses-02/func/{subject_id}_ses-02_task-rest_dir-ap_run-01_bold.nii.gz"
+        )
+        fmri2t1_wf.inputs.input_node.func_sbref_img = (
+            f"{bids_path}/{subject_id}/ses-02/func/{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref.nii.gz"
+        )
+        fmri2t1_wf.inputs.input_node.func_segfm_ap_img = (
+            f"{bids_path}/{subject_id}/ses-02/fmap/{subject_id}_ses-02_acq-restsefm_dir-ap_run-01_epi.nii.gz"
+        )
+        fmri2t1_wf.inputs.input_node.func_segfm_pa_img = (
+            f"{bids_path}/{subject_id}/ses-02/fmap/{subject_id}_ses-02_acq-restsefm_dir-pa_run-01_epi.nii.gz"
+        )
         fmri2t1_wf.inputs.input_node.T1_brain_freesurfer_mask = f"{recon_all_path}/{subject_id}_ses-02/mri/brain.mgz"
 
         if write_graph:
@@ -106,10 +118,15 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
         # Run the workflow
         fmri2t1_wf.run()
 
+        completed_subjects.append(subject_id)
+
     except Exception as e:
         logging.error("Error in fMRI to Standard Workflow for subject %s: %s", subject_id, e)
-        return None
-    
+        return completed_subjects
+
+    return completed_subjects
+
+
 def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1):
     """Perform coregistration of BOLD images to standard T1 for a given subject.
 
@@ -122,7 +139,10 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
     fmri2standard_folder (str): Directory within root_path to store fMRI to standard transformations.
     bids_path (str): Directory for BIDS data.
     coreg_EPT2T1 (spm.Coregister): The coregistration object for aligning BOLD to T1.
+    completed_subjects (list): List of subjects that have completed coregistration.
     """
+    completed_subjects = []
+
     try:
         # Create intermediate unzipped .nii files using subprocess
         subprocess.run(
@@ -189,9 +209,14 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
             check=True,
         )
 
+        completed_subjects.append(subject_id)
+
     except Exception as e:
         logging.error("Error during SPM coregistration for subject %s: %s", subject_id, e)
-        return None
+        return completed_subjects
+
+    return completed_subjects
+
 
 def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_path):
     """Extract white matter (WM) and cerebrospinal fluid (CSF) masks for nuisance correction.
@@ -206,8 +231,12 @@ def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_
     recon_all_path (str): Directory for FreeSurfer reconall data.
     output_masks (str): Directory for output masks.
     aseg_folder (str): Directory for the aseg.mgz file.
+    completed_subjects (list): List of subjects that have completed mask extraction.
     """
+    completed_subjects = []
+
     print("\n\nNUISANCE CORRECTION\n\n")
+
     try:
         # Define paths
         # Im commenting this out because it is not used in the function - but leaving in case it is needed for something
@@ -248,13 +277,16 @@ def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_
                 ],
                 check=True,
             )
+
+            completed_subjects.append(subject_id)
+
         except subprocess.CalledProcessError as e:
             logging.error("Error during WM and CSF mask extraction for subject %s: %s", subject_id, e)
-            return None
 
     except Exception as e:
         logging.error("Error in extracting WM and CSF masks for subject %s: %s", subject_id, e)
-        return None
+
+    return completed_subjects
 
 
 def run_nuisance_regression(subject_id, root_path):
@@ -267,7 +299,10 @@ def run_nuisance_regression(subject_id, root_path):
     subject_id (str): The identifier for the subject being processed.
     root_path (str): The root path for data storage.
     outdir (str): The directory for storing the nuisance regression data.
+    completed_subjects (list): List of subjects that have completed nuisance regression.
     """
+    completed_subjects = []
+
     try:
         wf_reg = get_nuisance_regressors_wf(
             outdir=os.path.join(root_path, "nuisance_correction"), subject_id=subject_id, timepoints=740
@@ -305,9 +340,11 @@ def run_nuisance_regression(subject_id, root_path):
         # Writes the graph and runs the workflow
         wf_reg.run()
 
+        completed_subjects.append(subject_id)
+
     except Exception as e:
         logging.error("Error in nuisance workflow for subject %s: %s", subject_id, e)
-        return None
+        return completed_subjects
 
 
 def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
@@ -331,7 +368,10 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
     sbref_niigz (str): The path to the SBRef image in .nii.gz format.
     sbref_niigzcopy (str): The path to the copied SBRef image in .nii.gz format.
     sbref_nii (str): The path to the SBRef image in .nii format.
+    completed_subjects (list): List of subjects that have completed MNI normalization.
     """
+    completed_subjects = []
+
     print("\n\nMNI NORMALIZATION\n\n")
     try:
         # Create necessary directory for normalization
@@ -382,7 +422,10 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
 
         # Copy and decompress sbref image
         shutil.copy(sbref_niigz, sbref_niigzcopy)
-        with gzip.open(sbref_niigzcopy, "rb") as f_in, open(sbref_nii, "wb") as f_out: # Write decompressed sbref image as .nii
+        with (
+            gzip.open(sbref_niigzcopy, "rb") as f_in,
+            open(sbref_nii, "wb") as f_out,
+        ):  # Write decompressed sbref image as .nii
             shutil.copyfileobj(f_in, f_out)  # Copy decompressed sbref image
 
         # Perform MNI normalization
@@ -393,9 +436,11 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
         MNI.inputs.write_bounding_box = [[-90, -126, -72], [90, 90, 108]]
         MNI.run()
 
+        completed_subjects.append(subject_id)
+
     except Exception as e:
         logging.error("Error during MNI Normalization for subject %s: %s", subject_id, e)
-        return None
+        return completed_subjects
 
 
 def apply_nuisance_correction(subject_id, root_path):
@@ -414,7 +459,10 @@ def apply_nuisance_correction(subject_id, root_path):
     mni_pre (str): The path to the pre-normalized MNI file.
     mni_post (str): The path to the post-normalized MNI file.
     nuisances (str): The path to the nuisance regressors file.
+    completed_subjects (list): List of subjects that have completed nuisance correction.
     """
+    completed_subjects = []
+
     print("\n\\APPLYING NUISANCE CORRECTION\n\n")
     try:
         # Define paths
@@ -485,9 +533,11 @@ def apply_nuisance_correction(subject_id, root_path):
         os.makedirs(output_directory, exist_ok=True)
         subprocess.run(command_nuisance, check=True)
 
+        completed_subjects.append(subject_id)
+
     except Exception as e:
         logging.error("Error during nuisance correction for subject %s: %s", subject_id, e)
-        return None
+        return completed_subjects
 
 
 def fmri_quality_control(
@@ -509,6 +559,7 @@ def fmri_quality_control(
     nuisance_correction_path (str): The path to the nuisance correction data.
     bids_path (str): The directory for BIDS data.
     recon_all_path (str): The path to the recon_all directory.
+    completed_subjects (list): List of subjects that have completed the QC process.
     qc_dir (str): The directory for storing quality control data.
     input_ (str): The path to the brain mask in BOLD space.
     ref (str): The path to the nuisance corrected BOLD image.
@@ -516,6 +567,8 @@ def fmri_quality_control(
     out (str): The path to the transformed brain mask.
     """
     print("\n\nFMRI QC\n\n")
+    completed_subjects = []
+
     try:
         # Create QC directory
         qc_dir = os.path.join(root_path, "QC", subject_id)
@@ -540,7 +593,7 @@ def fmri_quality_control(
 
     except Exception as e:
         logging.error("Error during framewise displacement for subject %s: %s", subject_id, e)
-        return None
+        return completed_subjects
 
     try:
         # Set additional paths for QA and brain mask
@@ -582,7 +635,7 @@ def fmri_quality_control(
 
     except Exception as e:
         logging.error("Error in brain mask to BOLD transformation for subject %s: %s", subject_id, e)
-        return None
+        return completed_subjects
 
     try:
         # Setup workflow for DVARS computation
@@ -603,11 +656,16 @@ def fmri_quality_control(
 
     except Exception as e:
         logging.error("Error in DVARS computation for subject %s: %s", subject_id, e)
-        return None
+        return completed_subjects
 
-    # Cleanup directories
+    # If all steps up to this point are successful, mark the subject as completed
+    completed_subjects.append(subject_id)
+
+    # Cleanup directories to free space
     shutil.rmtree(os.path.join(root_path, bids_path, subject_id), ignore_errors=True)
     shutil.rmtree(os.path.join(recon_all_path, subject_id), ignore_errors=True)
+
+    return completed_subjects
 
 
 def initialize_preprocessing_dirs(bids_dir, processed_directory):
@@ -623,7 +681,7 @@ def initialize_preprocessing_dirs(bids_dir, processed_directory):
         set: A set containing identifiers of subjects yet to be processed.
     """
     subjects_to_process = set(os.listdir(bids_dir))
-    done = set(os.listdir(processed_directory))  
+    done = set(os.listdir(processed_directory))
 
     subjects_to_process -= done  # Subtract processed subjects
     subjects_to_process.discard(".heudiconv")
@@ -632,42 +690,22 @@ def initialize_preprocessing_dirs(bids_dir, processed_directory):
     return subjects_to_process
 
 
-def get_subjects_with_errors(log_file_path, error_keywords):
-    """Parse the log file and return a set of subject IDs that have encountered the specified errors.
+def setup_logging(step_name):
+    """Configure the logging settings for a specific processing step.
+
+    This function sets up a logging configuration that writes logs to a file
+    named after the specific step being processed.
 
     Parameters:
-        log_file_path (str): Path to the log file.
-        error_keywords (list of str): Keywords that indicate errors for specific functions.
-
-    Returns:
-        set: A set of subject IDs that experienced errors.
+    step_name (str): The name of the processing step to log.
     """
-    subjects_with_errors = set()
-
-    with open(log_file_path, "r") as log_file:
-        for line in log_file:
-            if any(keyword in line for keyword in error_keywords):
-                # This regex extracts "sub-01" from the "Error during function for subject sub-01: ..."
-                subject_id = extract_subject_id_from_error_log(line)
-                if subject_id:
-                    subjects_with_errors.add(subject_id)
-
-    return subjects_with_errors
-
-
-def extract_subject_id_from_error_log(log_line):
-    """Extracts and returns the subject ID from a log line given a known format.
-
-    Parameters:
-        log_line (str): A line from the log file.
-
-    Returns:
-        str: The subject ID extracted from the log line.
-    """
-    import re
-
-    match = re.search(r"subject (\w+)", log_line)
-    return match.group(1) if match else None
+    log_file = f"{step_name}_logs.log"
+    logging.basicConfig(
+        level=logging.INFO,  # Can change this to only log errors
+        filename=log_file,
+        filemode="w",
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
 
 
 def main():
@@ -690,7 +728,7 @@ def main():
     """
     # Setup logging to file and console
     logging.basicConfig(
-        level=logging.INFO, filename="logs.log", filemode="w", format="%(asctime)s - %(levelname)s - %(message)s"
+        level=logging.ERROR, filename="logs.log", filemode="w", format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
     # Define all paths and directories for the preprocessing workflow
@@ -706,7 +744,6 @@ def main():
     qc_path = os.path.join(root_path, "QC")
     bids_dir = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
     processed_directory = "/home/rachel/Desktop/institute/UB/Superagers/MRI/processed_data/fMRI-preprocessed_tp2"
-    log_file_path = "/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/src/preprocessing/logs.log"
 
     # Define the SPM coregistration object
     coreg_EPI2T1 = spm.Coregister()
@@ -717,114 +754,92 @@ def main():
     #### Run the preprocessing workflow ####
 
     # Step 1.
+    # Setup logging for fMRI to standard transformation
+    setup_logging("transform_fmri_to_standard")
+
     # Define the partial function with fixed arguments
     transform_partial_fmri_to_standard = partial(
         transform_fmri_to_standard,
         root_path=root_path,
         bids_path=bids_path,
         recon_all_path=recon_all_path,
-        acparams_file=acparams_file
+        acparams_file=acparams_file,
     )
 
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation (`transform_fmri_to_standard`)
     with Pool(6) as pool:
-        pool.map(transform_partial_fmri_to_standard, subjects_to_process)
+        results = pool.map(transform_partial_fmri_to_standard, subjects_to_process)  # Store results in a variable
+
+    # Identify subjects ready for coregistration to run (`execute_coregistration`), excluding those with errors from `transform_fmri_to_standard`
+    coregistration_list = [subject for sublist in results for subject in sublist]
 
     # Step 2.
-    # Identify subjects needing coregistration to run (`execute_coregistration`), excluding those with errors from `transform_fmri_to_standard`
-    subjects_with_transform_errors = get_subjects_with_errors(log_file_path, ["transform_fmri_to_standard"])
-
-    # Filter the list of subject IDs to only those without errors
-    coregistration_list = [
-        subject_id for subject_id in subjects_to_process if subject_id not in subjects_with_transform_errors
-    ]
+    # Setup logging for coregistration
+    setup_logging("execute_coregistration")
 
     # Perform coregistration on the filtered list of subjects
     for subject in coregistration_list:
-        execute_coregistration(
-            subject,
-            root_path,
-            fmri2standard_folder,
-            bids_path,
-            coreg_EPI2T1
-        )
+        results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
+
+    # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
+    extract_wm_csf_masks_list = [subject for sublist in results for subject in sublist]
 
     # Step 3a.
-    # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
-    subjects_with_coregistration_errors = get_subjects_with_errors(log_file_path, ["execute_coregistration"])
-
-    # Filter the list of subject IDs to only those without errors
-    extract_wm_csf_masks_list = [
-        subject_id for subject_id in subjects_to_process if subject_id not in subjects_with_coregistration_errors
-    ]
+    # Setup logging for WM and CSF mask extraction
+    setup_logging("extract_wm_csf_masks")
 
     # Apply nuisance correction initial step using multiprocessing
     transform_partial_extract_wm_csf_masks = partial(
-        extract_wm_csf_masks,
+        results=extract_wm_csf_masks,
         root_path=root_path,
         fmri2standard_folder=fmri2standard_folder,
-        recon_all_path=recon_all_path
+        recon_all_path=recon_all_path,
     )
 
     pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
-    # Step 3b.
     # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
-    subjects_with_mask_errors = get_subjects_with_errors(log_file_path, ["extract_wm_csf_masks"])
+    nuisance_regression_list = [subject for sublist in results for subject in sublist]
 
-    # Filter the list of subject IDs to only those without errors
-    nuisance_regression_list = [
-        subject_id for subject_id in subjects_to_process if subject_id not in subjects_with_mask_errors
-    ]
+    # Step 3b.
+    # Setup logging for nuisance regression
+    setup_logging("run_nuisance_regression")
 
     # Execute advanced nuisance regression
     for subject in nuisance_regression_list:
-        run_nuisance_regression(
-            subject,
-            root_path
-        )
+        results = run_nuisance_regression(subject, root_path)
+
+    # Identify subjects needing MNI normalization to run (`mni_normalization`), excluding those with errors from `run_nuisance_regression`
+    mni_normalization_list = [subject for sublist in results for subject in sublist]
 
     # Step 4.
-    # Identify subjects needing MNI normalization to run (`mni_normalization`), excluding those with errors from `run_nuisance_regression`
-    subjects_with_nuisance_errors = get_subjects_with_errors(log_file_path, ["run_nuisance_regression"])
-
-    # Filter the list of subject IDs to only those without errors
-    mni_normalization_list = [
-        subject_id for subject_id in subjects_to_process if subject_id not in subjects_with_nuisance_errors
-    ]
+    # Setup logging for MNI normalization
+    setup_logging("mni_normalization")
 
     # Perform MNI normalization using multiprocessing
     for subject in mni_normalization_list:
-        mni_normalization(
-            subject,
-            root_path,
-            bids_path,
-            fmri2standard_path
-        )
+        results = mni_normalization(subject, root_path, bids_path, fmri2standard_path)
+
+    # Identify subjects needing nuisance regression removal to run (`apply_nuisance_correction`), excluding those with errors from `mni_normalization`
+    regression_list = [subject for sublist in results for subject in sublist]
 
     # Step 5.
-    # Identify subjects needing nuisance regression removal to run (`apply_nuisance_correction`), excluding those with errors from `mni_normalization`
-    subjects_with_mni_errors = get_subjects_with_errors(log_file_path, ["mni_normalization"])
-
-    # Filter the list of subject IDs to only those without errors
-    regression_list = [subject_id for subject_id in subjects_to_process if subject_id not in subjects_with_mni_errors]
+    # Setup logging for nuisance correction application
+    setup_logging("apply_nuisance_correction")
 
     ###### NOTE because I divided step 5 into two parts, ask Maria if both of these parts require parallelization. Remove if not needed
     # Apply nuisance correction using multiprocessing
-    transform_partial_apply_nuisance_correction = partial(
-        apply_nuisance_correction,
-        root_path=root_path
-    )
-    
+    transform_partial_apply_nuisance_correction = partial(results=apply_nuisance_correction, root_path=root_path)
+
     with Pool(8) as pool:
         pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
-    # Step 6.
     # Identify subjects needing fMRI quality control to run (`fmri_quality_control`), excluding those with errors from `apply_nuisance_correction`
-    subjects_with_regression_errors = get_subjects_with_errors(log_file_path, ["apply_nuisance_correction"])
+    qc_list = [subject for sublist in results for subject in sublist]
 
-    # Filter the list of subject IDs to only those without errors
-    qc_list = [subject_id for subject_id in subjects_to_process if subject_id not in subjects_with_regression_errors]
+    # Step 6.
+    # Setup logging for fMRI quality control
+    setup_logging("fmri_quality_control")
 
     # Perform fMRI quality control using multiprocessing
     transform_partial_fmri_quality_control = partial(
@@ -833,7 +848,7 @@ def main():
         fmri2standard_path=fmri2standard_path,
         nuisance_correction_path=nuisance_correction_path,
         bids_path=bids_path,
-        recon_all_path=recon_all_path
+        recon_all_path=recon_all_path,
     )
 
     with Pool(8) as pool:
