@@ -3,7 +3,7 @@ name = "preprocessing"
 version = "0.0.1"
 description = ""
 authors = []
-repository = "https://github.com/rachmorse/preprocessing.git"
+repository = "https://github.com/rachmorse/fmri_preprocessing.git"
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -11,7 +11,8 @@ python = ">=3.10"
 nipype = "^1.9.1"
 matplotlib = "^3.9.3"
 numpy = "^2.2.0"
-
+seaborn = "^0.12.2"
+nitime = "0.8"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=6,<7"

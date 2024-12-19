@@ -13,7 +13,6 @@ from pathlib import Path
 import seaborn as sns   
 import nitime as nit    
 
-# NOTE this is supposed to be needed for the QC framewise displacement figure. Check that this is correct
 # Custom workflow imports
 from bold2T1_wf import get_fmri2standard_wf
 from bold_nuisance_correction_wf import get_nuisance_regressors_wf
@@ -245,9 +244,6 @@ def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_
 
     try:
         # Define paths
-        # Im commenting this out because it is not used in the function - but leaving in case it is needed for something
-        # sbref2T1_path = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_sbref",
-        #     f"{subject_id}_ses-02_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz")
         bold2T1_path = os.path.join(
             root_path,
             fmri2standard_folder,
@@ -389,7 +385,6 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
         with gzip.open(T1_niigzcopy, "rb") as f_in, open(T1_nii, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
 
-        # NOTE This is the part to improve without having to change the file formats
         # Setup paths for sbref and bold images
         bold_niigz = os.path.join(
             fmri2standard_path,
@@ -464,8 +459,6 @@ def apply_nuisance_correction(subject_id, root_path):
     print("\n\nAPPLYING NUISANCE CORRECTION\n\n")
     try:
         # Define paths
-        #### NOTE this line is not used in the script but exists in Maria's
-        # nuisance_filter_bash = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/command.txt"
         new_name_nii = os.path.join(
             root_path,
             "normalization",
@@ -488,8 +481,7 @@ def apply_nuisance_correction(subject_id, root_path):
             "filter_regressors_bold",
             f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
         )
-        #### NOTE this line is not used in the script but exists in Maria's
-        # MNI_name = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-02_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz"
+
         output_directory = os.path.join(root_path, "nuisance_correction", subject_id, "filter_regressors_bold")
 
         # Perform gzip compression and remove the NII file
@@ -724,16 +716,16 @@ def main():
     # Define all paths and directories for the preprocessing workflow
     root_path = "/home/rachel/Desktop/Preprocessing"
     fmri2standard_folder = "fmri2standard"
-    source_dir = os.path.join("/home/rachel/Desktop/institute/UB/Superagers/MRI/freesurfer-reconall")
     mri_path = "/home/rachel/Desktop/institute/UB/Superagers/MRI"
     bids_path = os.path.join(mri_path, "BIDS")
     recon_all_path = os.path.join(mri_path, "freesurfer-reconall")
     acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
     fmri2standard_path = os.path.join(root_path, fmri2standard_folder)
     nuisance_correction_path = os.path.join(root_path, "nuisance_correction")
-    qc_path = os.path.join(root_path, "QC")
     bids_dir = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
     processed_directory = "/home/rachel/Desktop/institute/UB/Superagers/MRI/processed_data/fMRI-preprocessed_tp2"
+    # Only needed with copy step 
+    # source_dir = os.path.join("/home/rachel/Desktop/institute/UB/Superagers/MRI/freesurfer-reconall")
 
     # Configure MATLAB command
     mlab_cmd = '/usr/local/bin/matlab -nodesktop -nosplash'
@@ -746,8 +738,10 @@ def main():
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
     subjects_to_process = initialize_preprocessing_dirs(bids_dir, processed_directory)
-
+    
+    ######################################## 
     #### Run the preprocessing workflow ####
+    ######################################## 
 
     # Step 1.
     # Setup logging for fMRI to standard transformation
