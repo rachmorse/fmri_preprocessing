@@ -61,17 +61,19 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
     """Transform fMRI data to a standard space for a given subject.
 
     This function sets up and runs a workflow to align fMRI data to standard
-    space where each volume is lined up with the first one. It also prepares
+    space where each volume is aligned with the first. It also prepares
     required data and logs any errors encountered.
 
     Parameters:
     subject_id (str): The identifier for the subject being processed.
-    write_graph (bool): Whether to write a workflow graph. Defaults to False.
     root_path (str): The root path for the preprocessing workspace.
     bids_path (str): The path to the shared BIDS folder.
     recon_all_path (str): The path to the recon_all directory.
     acparams_file (str): The path to the acparams.txt file.
-    completed_subjects (list): List of subjects that have completed the transformation.
+    write_graph (bool): Whether to write a workflow graph. Defaults to False.
+
+    Returns:
+    list: A list of subjects that have completed the transformation.
     """
     print("##################################################")
     print(f"Processing subject: {subject_id}")
@@ -130,16 +132,18 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
 def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1):
     """Perform coregistration of BOLD images to standard T1 for a given subject.
 
-    This function converts intermediate files using a script, sets input paths,
-    and performs SPM coregistration. It logs errors encountered during execution.
+    This function converts intermediate files, sets input paths, and performs
+    SPM coregistration. It logs any errors encountered during execution.
 
     Parameters:
     subject_id (str): The identifier for the subject being processed.
     root_path (str): The root path for preprocessing.
-    fmri2standard_folder (str): Directory within root_path to store fMRI to standard transformations.
+    fmri2standard_folder (str): Directory for storing fMRI to standard transformations.
     bids_path (str): Directory for BIDS data.
-    coreg_EPT2T1 (spm.Coregister): The coregistration object for aligning BOLD to T1.
-    completed_subjects (list): List of subjects that have completed coregistration.
+    coreg_EPI2T1 (spm.Coregister): The coregistration object for aligning BOLD to T1.
+
+    Returns:
+    list: A list of subjects that have completed coregistration.
     """
     completed_subjects = []
 
@@ -222,16 +226,16 @@ def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_
     """Extract white matter (WM) and cerebrospinal fluid (CSF) masks for nuisance correction.
 
     This function prepares paths, creates necessary directories, and executes
-    a mask extraction script. Errors during this process are logged.
+    a mask extraction script. It logs any errors encountered during the process.
 
     Parameters:
     subject_id (str): The identifier for the subject being processed.
     root_path (str): The root path for data storage.
-    fmri2standard_folder (str): Directory within root_path for fMRI to standard transformations.
+    fmri2standard_folder (str): Directory for fMRI to standard transformations.
     recon_all_path (str): Directory for FreeSurfer reconall data.
-    output_masks (str): Directory for output masks.
-    aseg_folder (str): Directory for the aseg.mgz file.
-    completed_subjects (list): List of subjects that have completed mask extraction.
+
+    Returns:
+    list: A list of subjects that have completed the mask extraction.
     """
     completed_subjects = []
 
@@ -292,14 +296,15 @@ def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_
 def run_nuisance_regression(subject_id, root_path):
     """Run the nuisance regression workflow using pre-extracted masks.
 
-    This function sets up a workflow for removing nuisance signals from fMRI data.
-    Errors during this process are logged.
+    This function sets up a workflow for removing nuisance signals from fMRI data
+    and logs any errors during the process.
 
     Parameters:
     subject_id (str): The identifier for the subject being processed.
     root_path (str): The root path for data storage.
-    outdir (str): The directory for storing the nuisance regression data.
-    completed_subjects (list): List of subjects that have completed nuisance regression.
+
+    Returns:
+    list: A list of subjects that have completed the nuisance regression.
     """
     completed_subjects = []
 
@@ -350,25 +355,17 @@ def run_nuisance_regression(subject_id, root_path):
 def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
     """Perform MNI normalization on T1 and fMRI images for the given subject.
 
-    This function sets up the necessary files, decompresses them, and runs the SPM
-    normalization process. Errors during this process are logged.
+    This function sets up the necessary files, decompresses them, and runs
+    the SPM normalization process. Errors during this process are logged.
 
     Parameters:
     subject_id (str): The identifier for the subject being processed.
     root_path (str): The root path for data storage.
     bids_path (str): The path to the BIDS folder.
     fmri2standard_path (str): The path to the fMRI to standard transformations.
-    normalization_dir (str): The directory for storing the MNI normalized data.
-    T1_niigz (str): The path to the T1 image in .nii.gz format.
-    T1_niigzcopy (str): The path to the copied T1 image in .nii.gz format.
-    T1_nii (str): The path to the T1 image in .nii format.
-    bold_niigz (str): The path to the BOLD image in .nii.gz format.
-    bold_niigzcopy (str): The path to the copied BOLD image in .nii.gz format.
-    bold_nii (str): The path to the BOLD image in .nii format.
-    sbref_niigz (str): The path to the SBRef image in .nii.gz format.
-    sbref_niigzcopy (str): The path to the copied SBRef image in .nii.gz format.
-    sbref_nii (str): The path to the SBRef image in .nii format.
-    completed_subjects (list): List of subjects that have completed MNI normalization.
+
+    Returns:
+    list: A list of subjects that have completed MNI normalization.
     """
     completed_subjects = []
 
@@ -447,19 +444,15 @@ def apply_nuisance_correction(subject_id, root_path):
     """Apply nuisance correction for a given subject.
 
     This function handles gzip compression, file movements, and uses FSL tools
-    for regressing out nuisance signals from the data.
+    for regressing out nuisance signals from the data. It logs any errors during
+    the process.
 
     Parameters:
     subject_id (str): Identifier for the subject being processed.
     root_path (str): The root path for preprocessing.
-    new_name_nii (str): The path to the coregistered nii file.
-    nuisance_output (str): The path to the nuisance corrected output.
-    native_name (str): The path to the native space output.
-    output_directory (str): The directory for storing the output.
-    mni_pre (str): The path to the pre-normalized MNI file.
-    mni_post (str): The path to the post-normalized MNI file.
-    nuisances (str): The path to the nuisance regressors file.
-    completed_subjects (list): List of subjects that have completed nuisance correction.
+
+    Returns:
+    list: A list of subjects that have completed nuisance correction.
     """
     completed_subjects = []
 
@@ -545,12 +538,8 @@ def fmri_quality_control(
 ):
     """Perform fMRI quality control for a given subject.
 
-    This function involves calculating the framewise displacement and setting
-    up the brain mask and DVARS workflow.
-
-    DVARS quantifies the amount of change in activity from one volume to the next,
-    across the entire brain and is useful in identifying motion artifacts and
-    sudden spikes or other anomalies in fMRI.
+    This function calculates framewise displacement and sets up the
+    brain mask and DVARS workflow. Errors during the process are logged.
 
     Parameters:
     subject_id (str): Identifier for the subject being processed.
@@ -559,12 +548,9 @@ def fmri_quality_control(
     nuisance_correction_path (str): The path to the nuisance correction data.
     bids_path (str): The directory for BIDS data.
     recon_all_path (str): The path to the recon_all directory.
-    completed_subjects (list): List of subjects that have completed the QC process.
-    qc_dir (str): The directory for storing quality control data.
-    input_ (str): The path to the brain mask in BOLD space.
-    ref (str): The path to the nuisance corrected BOLD image.
-    omat (str): The path to the transformation matrix.
-    out (str): The path to the transformed brain mask.
+
+    Returns:
+    list: A list of subjects that have completed the QC process.
     """
     print("\n\nFMRI QC\n\n")
     completed_subjects = []
@@ -674,8 +660,6 @@ def initialize_preprocessing_dirs(bids_dir, processed_directory):
     Parameters:
         bids_dir (str): Directory containing the BIDS datasets.
         processed_directory (str): Directory containing processed data.
-        subjects_to_process (set): Set of subjects to process.
-        done (str): Directory containing processed data.
 
     Returns:
         set: A set containing identifiers of subjects yet to be processed.

@@ -24,8 +24,7 @@ This script executes the fMRI preprocessing workflow using Nipype and other neur
 - **apply_nuisance_correction**: Applies processing steps to regress out nuisance signals from the fMRI data.
 - **fmri_quality_control**: Conducts framewise displacement calculations and DVARS computation for fMRI quality assessment.
 - **initialize_preprocessing_dirs**: Sets up initial directories and retrieves a list of subjects to process.
-- **get_subjects_with_errors**: Extracts subject IDs from error log files that show encountered errors during each processing steps.
-- **extract_subject_id_from_error_log**: Updates the format of the extracted subject ID from the error logs.
+- **setup_logging**: Configures the logging settings for a each processing step.
 - **main**: Initializes paths and directs the execution flow, conducting the preprocessing for all subjects.
 
 ## Notes

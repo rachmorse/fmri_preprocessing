@@ -1,75 +1,35 @@
-2024-12-18 16:53:23,393 - INFO - Workflow sub-1031 settings: ['check', 'execution', 'logging', 'monitoring']
-2024-12-18 16:53:23,403 - INFO - Running serially.
-2024-12-18 16:53:23,403 - INFO - [Node] Setting-up "sub-1031.Mean_SEgfm_AP" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Mean_SEgfm_AP".
-2024-12-18 16:53:23,406 - INFO - [Node] Executing "Mean_SEgfm_AP" <nipype.interfaces.fsl.maths.MeanImage>
-2024-12-18 16:53:24,142 - INFO - [Node] Finished "Mean_SEgfm_AP", elapsed time 0.734744s.
-2024-12-18 16:53:24,145 - INFO - [Node] Setting-up "sub-1031.eliminate_first_scans" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/eliminate_first_scans".
-2024-12-18 16:53:24,148 - INFO - [Node] Executing "eliminate_first_scans" <nipype.interfaces.fsl.utils.ExtractROI>
-2024-12-18 16:55:08,670 - INFO - [Node] Finished "eliminate_first_scans", elapsed time 104.521873s.
-2024-12-18 16:55:08,673 - INFO - [Node] Setting-up "sub-1031.Merge_ap_pa_inputs" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Merge_ap_pa_inputs".
-2024-12-18 16:55:08,674 - INFO - [Node] Executing "Merge_ap_pa_inputs" <nipype.interfaces.utility.base.Merge>
-2024-12-18 16:55:08,675 - INFO - [Node] Finished "Merge_ap_pa_inputs", elapsed time 0.000189s.
-2024-12-18 16:55:08,677 - INFO - [Node] Setting-up "sub-1031.mask_T1" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/mask_T1".
-2024-12-18 16:55:08,679 - INFO - [Node] Executing "mask_T1" <nipype.interfaces.fsl.preprocess.BET>
-2024-12-18 16:55:16,043 - INFO - [Node] Finished "mask_T1", elapsed time 7.363262s.
-2024-12-18 16:55:16,045 - INFO - [Node] Setting-up "sub-1031.vol2vol" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/vol2vol".
-2024-12-18 16:55:16,048 - INFO - [Node] Executing "vol2vol" <nipype.interfaces.freesurfer.preprocess.ApplyVolTransform>
-2024-12-18 16:55:16,499 - INFO - stdout 2024-12-18T16:55:16.498858:movvol /home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/vol2vol/brain.mgz
-2024-12-18 16:55:16,499 - INFO - stdout 2024-12-18T16:55:16.498858:targvol /home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS/sub-1031/ses-02/anat/sub-1031_ses-02_run-01_T1w.nii.gz
-2024-12-18 16:55:16,500 - INFO - stdout 2024-12-18T16:55:16.498858:outvol brainmask_warped.nii.gz
-2024-12-18 16:55:16,500 - INFO - stdout 2024-12-18T16:55:16.498858:invert 0
-2024-12-18 16:55:16,500 - INFO - stdout 2024-12-18T16:55:16.498858:tal    0
-2024-12-18 16:55:16,500 - INFO - stdout 2024-12-18T16:55:16.498858:talres 2
-2024-12-18 16:55:16,500 - INFO - stdout 2024-12-18T16:55:16.498858:regheader 1
-2024-12-18 16:55:16,501 - INFO - stdout 2024-12-18T16:55:16.498858:noresample 0
-2024-12-18 16:55:16,501 - INFO - stdout 2024-12-18T16:55:16.498858:interp  trilinear (1)
-2024-12-18 16:55:16,501 - INFO - stdout 2024-12-18T16:55:16.498858:precision  float (3)
-2024-12-18 16:55:16,501 - INFO - stdout 2024-12-18T16:55:16.498858:Gdiag_no  -1
-2024-12-18 16:55:16,501 - INFO - stdout 2024-12-18T16:55:16.498858:Synth      0
-2024-12-18 16:55:16,501 - INFO - stdout 2024-12-18T16:55:16.498858:SynthSeed  1734693516
-2024-12-18 16:55:16,502 - INFO - stdout 2024-12-18T16:55:16.498858:
-2024-12-18 16:55:16,502 - INFO - stdout 2024-12-18T16:55:16.498858:Computing registration based on scanner-to-scanner
-2024-12-18 16:55:16,502 - INFO - stdout 2024-12-18T16:55:16.498858:
-2024-12-18 16:55:16,502 - INFO - stdout 2024-12-18T16:55:16.498858:Final tkRAS-to-tkRAS Matrix is:
-2024-12-18 16:55:16,502 - INFO - stdout 2024-12-18T16:55:16.498858:-0.99900   0.01615   0.04181  -0.00002;
-2024-12-18 16:55:16,502 - INFO - stdout 2024-12-18T16:55:16.498858:-0.03902   0.14562  -0.98857   0.00002;
-2024-12-18 16:55:16,502 - INFO - stdout 2024-12-18T16:55:16.498858: 0.02205   0.98921   0.14484   0.00000;
-2024-12-18 16:55:16,503 - INFO - stdout 2024-12-18T16:55:16.498858: 0.00000   0.00000   0.00000   1.00000;
-2024-12-18 16:55:16,503 - INFO - stdout 2024-12-18T16:55:16.498858:
-2024-12-18 16:55:16,503 - INFO - stdout 2024-12-18T16:55:16.498858:
-2024-12-18 16:55:16,503 - INFO - stdout 2024-12-18T16:55:16.498858:Vox2Vox Matrix is:
-2024-12-18 16:55:16,503 - INFO - stdout 2024-12-18T16:55:16.498858:-0.79920   0.03345  -0.01292   208.16690;
-2024-12-18 16:55:16,503 - INFO - stdout 2024-12-18T16:55:16.498858: 0.01764   0.11587  -0.79137   235.40324;
-2024-12-18 16:55:16,503 - INFO - stdout 2024-12-18T16:55:16.498858: 0.03121   0.79086   0.11649  -12.51352;
-2024-12-18 16:55:16,504 - INFO - stdout 2024-12-18T16:55:16.498858: 0.00000   0.00000   0.00000   1.00000;
-2024-12-18 16:55:20,031 - INFO - stdout 2024-12-18T16:55:20.031193:
-2024-12-18 16:55:20,031 - INFO - stdout 2024-12-18T16:55:20.031193:Resampling
-2024-12-18 16:55:20,031 - INFO - stdout 2024-12-18T16:55:20.031193:Output registration matrix is identity
-2024-12-18 16:55:20,031 - INFO - stdout 2024-12-18T16:55:20.031193:
-2024-12-18 16:55:20,031 - INFO - stdout 2024-12-18T16:55:20.031193:mri_vol2vol done
-2024-12-18 16:55:20,080 - INFO - [Node] Finished "vol2vol", elapsed time 4.031369s.
-2024-12-18 16:55:20,083 - INFO - [Node] Setting-up "sub-1031.Corregister_SBref2SEgfm" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Corregister_SBref2SEgfm".
-2024-12-18 16:55:20,086 - INFO - [Node] Executing "Corregister_SBref2SEgfm" <nipype.interfaces.fsl.preprocess.FLIRT>
-2024-12-18 16:55:27,478 - INFO - [Node] Finished "Corregister_SBref2SEgfm", elapsed time 7.390223s.
-2024-12-18 16:55:27,481 - INFO - [Node] Setting-up "sub-1031.Merge_SEgfm_AP_PA" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Merge_SEgfm_AP_PA".
-2024-12-18 16:55:27,484 - INFO - [Node] Executing "Merge_SEgfm_AP_PA" <nipype.interfaces.fsl.utils.Merge>
-2024-12-18 16:55:28,563 - INFO - [Node] Finished "Merge_SEgfm_AP_PA", elapsed time 1.077525s.
-2024-12-18 16:55:28,565 - INFO - [Node] Setting-up "sub-1031.binarize_mask" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/binarize_mask".
-2024-12-18 16:55:28,568 - INFO - [Node] Executing "binarize_mask" <nipype.interfaces.fsl.maths.UnaryMaths>
-2024-12-18 16:55:30,057 - INFO - [Node] Finished "binarize_mask", elapsed time 1.487242s.
-2024-12-18 16:55:30,059 - INFO - [Node] Setting-up "sub-1031.realign_fmri2SBref" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/realign_fmri2SBref".
-2024-12-18 16:55:30,063 - INFO - [Node] Executing "realign_fmri2SBref" <nipype.interfaces.fsl.preprocess.MCFLIRT>
-2024-12-18 17:00:13,847 - INFO - [Node] Finished "realign_fmri2SBref", elapsed time 283.782684s.
-2024-12-18 17:00:13,849 - INFO - [Node] Setting-up "sub-1031.Topup_SEgfm_estimation" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Topup_SEgfm_estimation".
-2024-12-18 17:00:13,852 - INFO - [Node] Executing "Topup_SEgfm_estimation" <nipype.interfaces.fsl.epi.TOPUP>
-2024-12-18 17:31:40,659 - INFO - [Node] Finished "Topup_SEgfm_estimation", elapsed time 1886.805364s.
-2024-12-18 17:31:40,664 - INFO - [Node] Setting-up "sub-1031.extract_mask" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/extract_mask".
-2024-12-18 17:31:40,667 - INFO - [Node] Executing "extract_mask" <nipype.interfaces.fsl.maths.BinaryMaths>
-2024-12-18 17:31:42,958 - INFO - [Node] Finished "extract_mask", elapsed time 2.2903000000000002s.
-2024-12-18 17:31:42,961 - INFO - [Node] Setting-up "sub-1031.apply_topup" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/apply_topup".
-2024-12-18 17:31:42,966 - INFO - [Node] Executing "apply_topup" <nipype.interfaces.fsl.epi.ApplyTOPUP>
-2024-12-18 17:36:21,727 - INFO - [Node] Finished "apply_topup", elapsed time 278.760046s.
-2024-12-18 17:36:21,730 - INFO - [Node] Setting-up "sub-1031.apply_topup_to_SBref" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/apply_topup_to_SBref".
-2024-12-18 17:36:21,735 - INFO - [Node] Executing "apply_topup_to_SBref" <nipype.interfaces.fsl.epi.ApplyTOPUP>
-2024-12-18 17:36:23,151 - INFO - [Node] Finished "apply_topup_to_SBref", elapsed time 1.4150070000000001s.
-2024-12-18 17:36:23,233 - ERROR - Error during SPM coregistration for subject sub-1031: The 'target' trait of a CoregisterInputSpec instance must be a pathlike object or string representing an existing file, but a value of '/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS/sub-1031/ses-02/anat/sub-1031_ses-02_run-01_T1w.nii' <class 'str'> was specified.
+2024-12-19 11:02:40,148 - INFO - Workflow sub-1031 settings: ['check', 'execution', 'logging', 'monitoring']
+2024-12-19 11:02:40,156 - INFO - Running serially.
+2024-12-19 11:02:40,157 - INFO - [Node] Setting-up "sub-1031.Mean_SEgfm_AP" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Mean_SEgfm_AP".
+2024-12-19 11:02:40,161 - INFO - [Node] Executing "Mean_SEgfm_AP" <nipype.interfaces.fsl.maths.MeanImage>
+2024-12-19 11:02:40,890 - INFO - [Node] Finished "Mean_SEgfm_AP", elapsed time 0.728735s.
+2024-12-19 11:02:40,894 - INFO - [Node] Setting-up "sub-1031.eliminate_first_scans" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/eliminate_first_scans".
+2024-12-19 11:02:40,896 - INFO - [Node] Executing "eliminate_first_scans" <nipype.interfaces.fsl.utils.ExtractROI>
+2024-12-19 11:04:27,757 - INFO - [Node] Finished "eliminate_first_scans", elapsed time 106.859892s.
+2024-12-19 11:04:27,759 - INFO - [Node] Setting-up "sub-1031.Merge_ap_pa_inputs" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Merge_ap_pa_inputs".
+2024-12-19 11:04:27,761 - INFO - [Node] Cached "sub-1031.Merge_ap_pa_inputs" - collecting precomputed outputs
+2024-12-19 11:04:27,761 - INFO - [Node] "sub-1031.Merge_ap_pa_inputs" found cached.
+2024-12-19 11:04:27,761 - INFO - [Node] Setting-up "sub-1031.mask_T1" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/mask_T1".
+2024-12-19 11:04:27,764 - INFO - [Node] Executing "mask_T1" <nipype.interfaces.fsl.preprocess.BET>
+2024-12-19 11:04:35,374 - INFO - [Node] Finished "mask_T1", elapsed time 7.609113s.
+2024-12-19 11:04:35,376 - INFO - [Node] Setting-up "sub-1031.vol2vol" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/vol2vol".
+2024-12-19 11:04:35,378 - INFO - [Node] Cached "sub-1031.vol2vol" - collecting precomputed outputs
+2024-12-19 11:04:35,378 - INFO - [Node] "sub-1031.vol2vol" found cached.
+2024-12-19 11:04:35,378 - INFO - [Node] Setting-up "sub-1031.Corregister_SBref2SEgfm" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Corregister_SBref2SEgfm".
+2024-12-19 11:04:35,379 - INFO - [Node] Outdated cache found for "sub-1031.Corregister_SBref2SEgfm".
+2024-12-19 11:04:35,381 - INFO - [Node] Executing "Corregister_SBref2SEgfm" <nipype.interfaces.fsl.preprocess.FLIRT>
+2024-12-19 11:04:41,122 - INFO - [Node] Finished "Corregister_SBref2SEgfm", elapsed time 5.739033s.
+2024-12-19 11:04:41,124 - INFO - [Node] Setting-up "sub-1031.Merge_SEgfm_AP_PA" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Merge_SEgfm_AP_PA".
+2024-12-19 11:04:41,127 - INFO - [Node] Executing "Merge_SEgfm_AP_PA" <nipype.interfaces.fsl.utils.Merge>
+2024-12-19 11:04:42,167 - INFO - [Node] Finished "Merge_SEgfm_AP_PA", elapsed time 1.03883s.
+2024-12-19 11:04:42,169 - INFO - [Node] Setting-up "sub-1031.binarize_mask" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/binarize_mask".
+2024-12-19 11:04:42,170 - INFO - [Node] Outdated cache found for "sub-1031.binarize_mask".
+2024-12-19 11:04:42,172 - INFO - [Node] Executing "binarize_mask" <nipype.interfaces.fsl.maths.UnaryMaths>
+2024-12-19 11:04:43,210 - INFO - [Node] Finished "binarize_mask", elapsed time 1.037141s.
+2024-12-19 11:04:43,212 - INFO - [Node] Setting-up "sub-1031.realign_fmri2SBref" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/realign_fmri2SBref".
+2024-12-19 11:04:43,214 - INFO - [Node] Outdated cache found for "sub-1031.realign_fmri2SBref".
+2024-12-19 11:04:43,217 - INFO - [Node] Executing "realign_fmri2SBref" <nipype.interfaces.fsl.preprocess.MCFLIRT>
+2024-12-19 11:09:30,211 - INFO - [Node] Finished "realign_fmri2SBref", elapsed time 286.993555s.
+2024-12-19 11:09:30,214 - INFO - [Node] Setting-up "sub-1031.Topup_SEgfm_estimation" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Topup_SEgfm_estimation".
+2024-12-19 11:09:30,215 - INFO - [Node] Outdated cache found for "sub-1031.Topup_SEgfm_estimation".
+2024-12-19 11:09:30,218 - INFO - [Node] Executing "Topup_SEgfm_estimation" <nipype.interfaces.fsl.epi.TOPUP>
