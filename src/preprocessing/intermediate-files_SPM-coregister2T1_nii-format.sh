@@ -7,15 +7,6 @@
 #bash <where_this_script_is>/intermediate-files_SPM-coregister2T1_nii-format.sh -r /home/mariacabello/wf_workspace -f OUTPUT_fmri2standard -b HEUDICONV_func -s sub-42525 -m to_nii_gz
 #*****************************************
 
-#ROOT_PATH=/home/mariacabello/wf_workspace
-#FMRI2STANDARD_FOLDER=OUTPUT_fmri2standard
-#HEUDICONV_FOLDER=HEUDICONV_func
-#ROOT_PATH=/home/mariacabello/wf_workspace/thesis_data/
-#FMRI2STANDARD_FOLDER=fmri2standard
-#HEUDICONV_FOLDER=func_anat
-#SUBJECT_ID=sub-42525
-
-
 POSITIONAL=()
 while [[ $# -gt 0 ]]
 do
@@ -43,7 +34,7 @@ case $key in
     shift # past value
     ;;
     -b|--bids_folder)
-    HEUDICONV_FOLDER="$2"
+    BIDS_PATH="$2"
     shift # past argument
     shift # past value
     ;;
@@ -65,19 +56,19 @@ if [ "$UNZIP_ZIP" = "to_nii" ] ;then
 
   echo "Creating copies and unziping files..." 
   #SBref
-  cp $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/apply_topup_to_SBref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_sbref/${SUBJECT_ID}_ses-02_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii.gz
+  cp $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/apply_topup_to_SBref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected.nii.gz $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_sbref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz
   gunzip $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_sbref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz
   echo "...SBref unziped as $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_sbref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii"
 
   #T1
-  cp $ROOT_PATH/$HEUDICONV_FOLDER/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w.nii.gz $ROOT_PATH/$HEUDICONV_FOLDER/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w_copy.nii.gz
-  gunzip $ROOT_PATH/$HEUDICONV_FOLDER/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w_copy.nii.gz
-  cp $ROOT_PATH/$HEUDICONV_FOLDER/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w_copy.nii $ROOT_PATH/$HEUDICONV_FOLDER/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w.nii
-  rm -f $ROOT_PATH/$HEUDICONV_FOLDER/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w_copy.nii
-  echo "...T1 unziped as $ROOT_PATH/$HEUDICONV_FOLDER/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w.nii"
+  cp $BIDS_PATH/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w.nii.gz $BIDS_PATH/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w_copy.nii.gz
+  gunzip $BIDS_PATH/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w_copy.nii.gz
+  cp $BIDS_PATH/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w_copy.nii $BIDS_PATH/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w.nii
+  rm -f $BIDS_PATH/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w_copy.nii
+  echo "...T1 unziped as $BIDS_PATH/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w.nii"
 
-  #BOLD sub-1031_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected
-  cp $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/apply_topup/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected.nii.gz $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_bold/${SUBJECT_ID}_ses-02_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz
+  #BOLD
+  cp $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/apply_topup/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected.nii.gz $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_bold/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz
   gunzip $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_bold/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz
   echo "...BOLD unziped as $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_bold/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii"
 
@@ -91,7 +82,7 @@ elif [ "$UNZIP_ZIP" = "to_nii_gz" ] ;then
   echo "...SBref compressed as $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_sbref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz"
 
   #T1
-  rm -f $ROOT_PATH/$HEUDICONV_FOLDER/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w.nii
+  rm -f $ROOT_PATH/${SUBJECT_ID}/ses-02/anat/${SUBJECT_ID}_ses-02_run-01_T1w.nii
   echo "...T1 unziped removed"
 
   #BOLD

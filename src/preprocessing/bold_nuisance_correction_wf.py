@@ -43,7 +43,7 @@ def motion_regressors(realign_movpar_txt, output_dir, order=0, derivatives=1):
     # for i in range(1, order + 1):
     # out_params2 = np.hstack((out_params2, np.power(out_params, i)))
     filename = os.path.join(output_dir, "motion_regressor.txt")
-    np.savetxt(filename, out_params2, fmt=b"%.10f")
+    np.savetxt(filename, out_params2, fmt="%.10f")
     return filename
 
 
@@ -68,7 +68,7 @@ def cosine_filter_txt(timepoints, timestep, output_dir, period_cut=128):
     X = cf._full_rank(cf._cosine_drift(period_cut, frametimes))[0]
     non_constant_regressors = X[:, :-1] if X.shape[1] > 1 else np.array([])
     filename = os.path.join(output_dir, "cosine_filter.txt")
-    np.savetxt(filename, non_constant_regressors, fmt=b"%.10f")
+    np.savetxt(filename, non_constant_regressors, fmt="%.10f")
     return filename
 
 
@@ -294,5 +294,5 @@ def merge_nuisance_regressors(nuisance_txts, output_dir, standardize=True):
     out_params = np.hstack((np.ones((len(out_params), 1)), out_params))
     filename = os.path.join(output_dir, "all_nuisances.txt")
     print(filename)
-    np.savetxt(filename, out_params, fmt=b"%.10f")
+    np.savetxt(filename, out_params, fmt="%.10f")
     return filename
