@@ -10,6 +10,8 @@ import subprocess
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
+import seaborn as sns   
+import nitime as nit    
 
 # NOTE this is supposed to be needed for the QC framewise displacement figure. Check that this is correct
 # Custom workflow imports
@@ -383,6 +385,7 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
 
         # Copy and decompress T1 image
         shutil.copy(T1_niigz, T1_niigzcopy)
+        os.chmod(T1_niigzcopy, 0o644)  # Set permissions to be readable 
         with gzip.open(T1_niigzcopy, "rb") as f_in, open(T1_nii, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
 
@@ -458,7 +461,7 @@ def apply_nuisance_correction(subject_id, root_path):
     """
     completed_subjects = []
 
-    print("\n\\APPLYING NUISANCE CORRECTION\n\n")
+    print("\n\nAPPLYING NUISANCE CORRECTION\n\n")
     try:
         # Define paths
         #### NOTE this line is not used in the script but exists in Maria's
@@ -467,7 +470,7 @@ def apply_nuisance_correction(subject_id, root_path):
             root_path,
             "normalization",
             subject_id,
-            f"w{subject_id}_ses-02_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii",
+            f"w{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii",
         )
 
         nuisance_output = os.path.join(
@@ -475,7 +478,7 @@ def apply_nuisance_correction(subject_id, root_path):
             "nuisance_correction",
             subject_id,
             "filter_regressors_bold",
-            f"{subject_id}_ses-02_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt.nii.gz",
+            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt.nii.gz",
         )
 
         native_name = os.path.join(
@@ -483,7 +486,7 @@ def apply_nuisance_correction(subject_id, root_path):
             "nuisance_correction",
             subject_id,
             "filter_regressors_bold",
-            f"{subject_id}_ses-02_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
+            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
         )
         #### NOTE this line is not used in the script but exists in Maria's
         # MNI_name = f"/home/mariacabello/wf_workspace/bold_preprocess_SA/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-02_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz"
@@ -491,14 +494,14 @@ def apply_nuisance_correction(subject_id, root_path):
 
         # Perform gzip compression and remove the NII file
         subprocess.run(["gzip", "-f", new_name_nii], check=True)
-        os.remove(new_name_nii)
+        # os.remove(new_name_nii)
         shutil.move(nuisance_output, native_name)
 
         mni_pre = os.path.join(
             root_path,
             "normalization",
             subject_id,
-            f"w{subject_id}_ses-02_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii.gz",
+            f"w{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz",
         )
 
         mni_post = os.path.join(
@@ -506,7 +509,7 @@ def apply_nuisance_correction(subject_id, root_path):
             "nuisance_correction",
             subject_id,
             "filter_regressors_bold",
-            f"{subject_id}_ses-02_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz",
+            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz",
         )
 
         nuisances = os.path.join(
@@ -569,7 +572,7 @@ def fmri_quality_control(
                 fmri2standard_path,
                 subject_id,
                 "realign_fmri2SBref",
-                f"{subject_id}_ses-02_run-01_rest_bold_ap_roi_mcf.nii.gz.par",
+                f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf.nii.gz.par",
             ),
             "parameter_source": "FSL",
             "out_file": os.path.join(qc_dir, "framewise_displ.txt"),
@@ -593,7 +596,7 @@ def fmri_quality_control(
             nuisance_correction_path,
             subject_id,
             "filter_regressors_bold",
-            f"{subject_id}_ses-02_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
+            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
         )
         omat = os.path.join(qc_dir, "brain_mask", "omat.mat")
         out = os.path.join(qc_dir, "brain_mask", "brain_mask_bin_BOLD_T1.nii.gz")
@@ -746,109 +749,108 @@ def main():
 
     #### Run the preprocessing workflow ####
 
-    # # Step 1.
-    # # Setup logging for fMRI to standard transformation
-    # setup_logging("transform_fmri_to_standard")
+    # Step 1.
+    # Setup logging for fMRI to standard transformation
+    setup_logging("transform_fmri_to_standard")
 
-    # # Define the partial function with fixed arguments
-    # transform_partial_fmri_to_standard = partial(
-    #     transform_fmri_to_standard,
-    #     root_path=root_path,
-    #     bids_path=bids_path,
-    #     recon_all_path=recon_all_path,
-    #     acparams_file=acparams_file,
-    # )
+    # Define the partial function with fixed arguments
+    transform_partial_fmri_to_standard = partial(
+        transform_fmri_to_standard,
+        root_path=root_path,
+        bids_path=bids_path,
+        recon_all_path=recon_all_path,
+        acparams_file=acparams_file,
+    )
 
-    # # Set up a multiprocessing pool to parallelize fMRI standard space transformation (`transform_fmri_to_standard`)
-    # with Pool(6) as pool:
-    #     results = pool.map(transform_partial_fmri_to_standard, subjects_to_process)  # Store results in a variable
+    # Set up a multiprocessing pool to parallelize fMRI standard space transformation (`transform_fmri_to_standard`)
+    with Pool(6) as pool:
+        results = pool.map(transform_partial_fmri_to_standard, subjects_to_process)  # Store results in a variable
 
-    # # Identify subjects ready for coregistration to run (`execute_coregistration`), excluding those with errors from `transform_fmri_to_standard`
-    # # coregistration_list = [subject for sublist in results for subject in sublist]
+    # Identify subjects ready for coregistration to run (`execute_coregistration`), excluding those with errors from `transform_fmri_to_standard`
+    coregistration_list = [subject for sublist in results for subject in sublist]
 
-    # # Step 2.
-    # # Setup logging for coregistration
-    # setup_logging("execute_coregistration")
+    # Step 2.
+    # Setup logging for coregistration
+    setup_logging("execute_coregistration")
 
-    # # Perform coregistration on the filtered list of subjects
-    # for subject in coregistration_list:
-    #     results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
+    # Perform coregistration on the filtered list of subjects
+    for subject in coregistration_list:
+        results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
 
-    # # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
-    # extract_wm_csf_masks_list = [subject for sublist in results for subject in sublist]
+    # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
+    extract_wm_csf_masks_list = [subject for sublist in results for subject in sublist]
 
-    # # Step 3a.
-    # # Setup logging for WM and CSF mask extraction
-    # setup_logging("extract_wm_csf_masks")
+    # Step 3a.
+    # Setup logging for WM and CSF mask extraction
+    setup_logging("extract_wm_csf_masks")
 
-    # # Apply nuisance correction initial step using multiprocessing
-    # transform_partial_extract_wm_csf_masks = partial(
-    #     extract_wm_csf_masks,
-    #     root_path=root_path,
-    #     fmri2standard_folder=fmri2standard_folder,
-    #     recon_all_path=recon_all_path,
-    # )
-    # # Use multiprocessing Pool to apply the function
-    # with Pool(os.cpu_count()) as pool:
-    #     results = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
+    # Apply nuisance correction initial step using multiprocessing
+    transform_partial_extract_wm_csf_masks = partial(
+        extract_wm_csf_masks,
+        root_path=root_path,
+        fmri2standard_folder=fmri2standard_folder,
+        recon_all_path=recon_all_path,
+    )
+    # Use multiprocessing Pool to apply the function
+    with Pool(os.cpu_count()) as pool:
+        results = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
-    # # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
-    # nuisance_regression_list = [subject for sublist in results for subject in sublist]
+    # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
+    nuisance_regression_list = [subject for sublist in results for subject in sublist]
 
-    # # Step 3b.
-    # # Setup logging for nuisance regression
-    # setup_logging("run_nuisance_regression")
+    # Step 3b.
+    # Setup logging for nuisance regression
+    setup_logging("run_nuisance_regression")
 
-    # # Execute advanced nuisance regression
-    # for subject in nuisance_regression_list:
-    #     results = run_nuisance_regression(subject, root_path)
-    #     results.append(results)  # Collect all subjects' results.
+    # Execute advanced nuisance regression
+    for subject in nuisance_regression_list:
+        results = run_nuisance_regression(subject, root_path)
+        results.append(results)  # Collect all subjects' results.
 
-    # # Identify subjects needing MNI normalization to run (`mni_normalization`), excluding those with errors from `run_nuisance_regression`
-    # mni_normalization_list = [subject for sublist in results for subject in sublist]
+    # Identify subjects needing MNI normalization to run (`mni_normalization`), excluding those with errors from `run_nuisance_regression`
+    mni_normalization_list = [subject for sublist in results for subject in sublist]
 
-############ CHANGE SUBJECT LIST ###########
     # Step 4.
     # Setup logging for MNI normalization
     setup_logging("mni_normalization")
 
     # Perform MNI normalization using multiprocessing
-    for subject in subjects_to_process:
+    for subject in mni_normalization_list:
         results = mni_normalization(subject, root_path, bids_path, fmri2standard_path)
 
     # Identify subjects needing nuisance regression removal to run (`apply_nuisance_correction`), excluding those with errors from `mni_normalization`
     regression_list = [subject for sublist in results for subject in sublist]
 
-    # # Step 5.
-    # # Setup logging for nuisance correction application
-    # setup_logging("apply_nuisance_correction")
+    # Step 5.
+    # Setup logging for nuisance correction application
+    setup_logging("apply_nuisance_correction")
 
-    # ###### NOTE because I divided step 5 into two parts, ask Maria if both of these parts require parallelization. Remove if not needed
-    # # Apply nuisance correction using multiprocessing
-    # transform_partial_apply_nuisance_correction = partial(results=apply_nuisance_correction, root_path=root_path)
+    ###### NOTE because I divided step 5 into two parts, ask Maria if both of these parts require parallelization. Remove if not needed
+    # Apply nuisance correction using multiprocessing
+    transform_partial_apply_nuisance_correction = partial(apply_nuisance_correction, root_path=root_path)
 
-    # with Pool(8) as pool:
-    #     pool.map(transform_partial_apply_nuisance_correction, regression_list)
+    with Pool(8) as pool:
+        results = pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
-    # # Identify subjects needing fMRI quality control to run (`fmri_quality_control`), excluding those with errors from `apply_nuisance_correction`
-    # qc_list = [subject for sublist in results for subject in sublist]
+    # Identify subjects needing fMRI quality control to run (`fmri_quality_control`), excluding those with errors from `apply_nuisance_correction`
+    qc_list = [subject for sublist in results for subject in sublist]
 
-    # # Step 6.
-    # # Setup logging for fMRI quality control
-    # setup_logging("fmri_quality_control")
+    # Step 6.
+    # Setup logging for fMRI quality control
+    setup_logging("fmri_quality_control")
 
-    # # Perform fMRI quality control using multiprocessing
-    # transform_partial_fmri_quality_control = partial(
-    #     fmri_quality_control,
-    #     root_path=root_path,
-    #     fmri2standard_path=fmri2standard_path,
-    #     nuisance_correction_path=nuisance_correction_path,
-    #     bids_path=bids_path,
-    #     recon_all_path=recon_all_path,
-    # )
+    # Perform fMRI quality control using multiprocessing
+    transform_partial_fmri_quality_control = partial(
+        fmri_quality_control,
+        root_path=root_path,
+        fmri2standard_path=fmri2standard_path,
+        nuisance_correction_path=nuisance_correction_path,
+        bids_path=bids_path,
+        recon_all_path=recon_all_path,
+    )
 
-    # with Pool(8) as pool:
-    #     pool.map(transform_partial_fmri_quality_control, qc_list)
+    with Pool(8) as pool:
+        pool.map(transform_partial_fmri_quality_control, qc_list)
 
 
 if __name__ == "__main__":

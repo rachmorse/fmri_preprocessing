@@ -1,0 +1,5 @@
+2024-12-19 16:56:21,863 - INFO - Workflow sub-1031 settings: ['check', 'execution', 'logging', 'monitoring']
+2024-12-19 16:56:21,868 - INFO - Running serially.
+2024-12-19 16:56:21,869 - INFO - [Node] Setting-up "sub-1031.dvars_node" in "/home/rachel/Desktop/Preprocessing/QC/sub-1031/dvars_node".
+2024-12-19 16:56:21,873 - INFO - [Node] Executing "dvars_node" <nipype.algorithms.confounds.ComputeDVARS>
+2024-12-19 16:57:27,692 - INFO - [Node] Finished "dvars_node", elapsed time 65.81887s.
