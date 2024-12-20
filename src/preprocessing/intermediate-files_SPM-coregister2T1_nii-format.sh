@@ -54,7 +54,7 @@ if [ "$UNZIP_ZIP" = "to_nii" ] ;then
   mkdir -p $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_bold
   echo "Created spm_coregister2T1_bold folder"
 
-  echo "Creating copies and unziping files..." 
+  echo "Creating copies and unziping files..."
   #SBref
   cp $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/apply_topup_to_SBref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected.nii.gz $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_sbref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz
   gunzip $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_sbref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz
@@ -75,7 +75,7 @@ if [ "$UNZIP_ZIP" = "to_nii" ] ;then
 elif [ "$UNZIP_ZIP" = "to_nii_gz" ] ;then
 
   echo "Deleting copies and compressing results from SPM-Coregister..."
-  #SBref 
+  #SBref
   gzip $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_sbref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii
   #if unziped version already exists, remove
   rm -f $ROOT_PATH/$FMRI2STANDARD_FOLDER/${SUBJECT_ID}/spm_coregister2T1_sbref/${SUBJECT_ID}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii

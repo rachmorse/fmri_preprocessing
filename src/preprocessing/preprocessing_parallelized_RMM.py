@@ -7,12 +7,10 @@ import logging
 import os
 import shutil
 import subprocess
-from typing import Optional, Set
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
-import seaborn as sns   
-import nitime as nit    
+from typing import Optional
 
 # Custom workflow imports
 from bold2T1_wf import get_fmri2standard_wf
@@ -25,15 +23,8 @@ from nipype.interfaces import spm, utility
 
 # Set up logging
 root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
+root_logger.setLevel(logging.ERROR)
 
-#     mri_path = "/home/rachel/Desktop/institute/UB/Superagers/MRI"
-#     bids_path = os.path.join(mri_path, "BIDS")
-#     recon_all_path = os.path.join(mri_path, "freesurfer-reconall")
-#     acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
-#     fmri2standard_path = os.path.join(root_path, fmri2standard_folder)
-#     nuisance_correction_path = os.path.join(root_path, "nuisance_correction")
-#     bids_dir = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
 
 # def prepare_data(subject_id, recon_all_path, source_dir):
 #     """
@@ -54,7 +45,6 @@ root_logger.setLevel(logging.INFO)
 #         if not os.path.isfile(aseg_file):
 #             print("Copying aseg.mgz and brain.mgz from institut freesurfer-reconall folder...")
 
-# ######## UNCLEAR
 #             # Create required directories
 #             os.makedirs(mri_dir, exist_ok=True)
 
@@ -69,7 +59,10 @@ root_logger.setLevel(logging.INFO)
 #     except Exception as e:
 #         logging.error("Error copying aseg.mgz & brain.mgz for subject %s: %s", subject_id, e)
 
-def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path, acparams_file, write_graph=False) -> str:
+
+def transform_fmri_to_standard(
+    subject_id, root_path, bids_path, recon_all_path, acparams_file, write_graph=False
+) -> str:
     """Transform fMRI data to a standard space for a given subject.
 
     This function sets up and runs a workflow to align fMRI data to standard
@@ -378,7 +371,7 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
 
         # Copy and decompress T1 image
         shutil.copy(T1_niigz, T1_niigzcopy)
-        os.chmod(T1_niigzcopy, 0o644)  # Set permissions to be readable 
+        os.chmod(T1_niigzcopy, 0o644)  # Set permissions to be readable
         with gzip.open(T1_niigzcopy, "rb") as f_in, open(T1_nii, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
 
@@ -390,7 +383,8 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
             f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz",
         )
         bold_niigzcopy = os.path.join(
-            normalization_dir, f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz"
+            normalization_dir,
+            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz",
         )
         bold_nii = os.path.join(
             normalization_dir, f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii"
@@ -402,7 +396,8 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
             f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
         )
         sbref_niigzcopy = os.path.join(
-            normalization_dir, f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz"
+            normalization_dir,
+            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
         )
         sbref_nii = os.path.join(
             normalization_dir, f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii"
@@ -431,7 +426,7 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
     except Exception as e:
         logging.error("Error during MNI Normalization for subject %s: %s", subject_id, e)
         return
-    
+
     return subject_id
 
 
@@ -519,7 +514,7 @@ def apply_nuisance_correction(subject_id, root_path) -> Optional[str]:
     except Exception as e:
         logging.error("Error during nuisance correction for subject %s: %s", subject_id, e)
         return
-        
+
     return subject_id
 
 
@@ -669,7 +664,6 @@ def initialize_preprocessing_dirs(bids_dir, root_path):
     subjects_to_process = set()
 
     for subject_id in os.listdir(bids_dir):
-
         subject_path = os.path.join(bids_dir, subject_id)
         print(subject_path, os.path.exists(subject_path))
         if os.path.isdir(subject_path):
@@ -677,11 +671,11 @@ def initialize_preprocessing_dirs(bids_dir, root_path):
 
     # Filter to find subjects that still need processing
     subjects_needing_processing = {
-        subject_id for subject_id in subjects_to_process
-        if not is_processed(subject_id, root_path)
+        subject_id for subject_id in subjects_to_process if not is_processed(subject_id, root_path)
     }
 
     return subjects_needing_processing
+
 
 def change_logger_file(file_name: str):
     """Configure the logging settings for a specific processing step.
@@ -693,7 +687,7 @@ def change_logger_file(file_name: str):
         step_name (str): The name of the processing step to log.
     """
     root_logger = logging.getLogger()
-    
+
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
 
@@ -722,33 +716,32 @@ def main():
 
     Paths for inputs and logs are defined relative to the workflow's root directory.
     """
-
     # Define all paths and directories for the preprocessing workflow
     root_path = "/home/rachel/Desktop/Preprocessing"
     fmri2standard_folder = "fmri2standard"
-    mri_path = "/home/rachel/Desktop/institute/UB/Superagers/MRI"
+    mri_path = "/pool/guttmann/institut/UB/Superagers/MRI"
     bids_path = os.path.join(mri_path, "BIDS")
     recon_all_path = os.path.join(mri_path, "freesurfer-reconall")
     acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
     fmri2standard_path = os.path.join(root_path, fmri2standard_folder)
     nuisance_correction_path = os.path.join(root_path, "nuisance_correction")
-    bids_dir = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
+    bids_dir = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
 
     # Configure MATLAB command
-    mlab_cmd = '/usr/local/bin/matlab -nodesktop -nosplash'
+    mlab_cmd = "/usr/local/bin/matlab -nodesktop -nosplash"
 
     # Set the SPM paths using Nipype
-    spm.SPMCommand.set_mlab_paths(paths='/home/rachel/spm12', matlab_cmd=mlab_cmd)
+    spm.SPMCommand.set_mlab_paths(paths="/home/rachel/spm12", matlab_cmd=mlab_cmd)
 
     # Define the SPM coregistration object
     coreg_EPI2T1 = spm.Coregister()
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
     subjects_to_process = initialize_preprocessing_dirs(bids_dir, root_path)
-        
-    ######################################## 
+
+    ########################################
     #### Run the preprocessing workflow ####
-    ######################################## 
+    ########################################
 
     # Step 1.
     # Setup logging for fMRI to standard transformation
@@ -773,7 +766,7 @@ def main():
     # Step 2.
     # Setup logging for coregistration
     change_logger_file("log_02_execute_coregistration")
-    
+
     # Perform coregistration on the filtered list of subjects
     extract_wm_csf_masks_list = []  # Reset results for the next phase
     for subject in coregistration_list:
@@ -808,7 +801,7 @@ def main():
     change_logger_file("log_03b_run_nuisance_regression")
 
     # Execute advanced nuisance regression
-    mni_normalization_list = [] 
+    mni_normalization_list = []
     for subject in nuisance_regression_list:
         results = run_nuisance_regression(subject, root_path)
         if results is not None:
@@ -836,7 +829,7 @@ def main():
     with Pool(8) as pool:
         qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
-    qc_list = [subject for subject in qc_list if subject is not None] 
+    qc_list = [subject for subject in qc_list if subject is not None]
 
     # Step 6.
     # Setup logging for fMRI quality control
@@ -858,7 +851,10 @@ def main():
     final_results = [subject for subject in final_results if subject is not None]
 
     failed_subjects = subjects_to_process - set(final_results)
-    print(f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"+ "\n".join(failed_subjects))
+    print(
+        f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"
+        + "\n".join(failed_subjects)
+    )
 
 
 if __name__ == "__main__":
