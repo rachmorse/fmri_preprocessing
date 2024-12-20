@@ -1,0 +1,41 @@
+2024-12-20T12:19:37 - INFO - Workflow sub-1031 settings: ['check', 'execution', 'logging', 'monitoring']
+2024-12-20T12:19:37 - INFO - Running serially.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.Mean_SEgfm_AP" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Mean_SEgfm_AP".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.Mean_SEgfm_AP" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.Mean_SEgfm_AP" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.eliminate_first_scans" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/eliminate_first_scans".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.eliminate_first_scans" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.eliminate_first_scans" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.Merge_ap_pa_inputs" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Merge_ap_pa_inputs".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.Merge_ap_pa_inputs" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.Merge_ap_pa_inputs" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.mask_T1" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/mask_T1".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.mask_T1" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.mask_T1" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.vol2vol" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/vol2vol".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.vol2vol" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.vol2vol" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.Corregister_SBref2SEgfm" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Corregister_SBref2SEgfm".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.Corregister_SBref2SEgfm" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.Corregister_SBref2SEgfm" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.Merge_SEgfm_AP_PA" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Merge_SEgfm_AP_PA".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.Merge_SEgfm_AP_PA" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.Merge_SEgfm_AP_PA" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.binarize_mask" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/binarize_mask".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.binarize_mask" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.binarize_mask" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.realign_fmri2SBref" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/realign_fmri2SBref".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.realign_fmri2SBref" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.realign_fmri2SBref" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.Topup_SEgfm_estimation" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Topup_SEgfm_estimation".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.Topup_SEgfm_estimation" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.Topup_SEgfm_estimation" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.extract_mask" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/extract_mask".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.extract_mask" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.extract_mask" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.apply_topup" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/apply_topup".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.apply_topup" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.apply_topup" found cached.
+2024-12-20T12:19:37 - INFO - [Node] Setting-up "sub-1031.apply_topup_to_SBref" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/apply_topup_to_SBref".
+2024-12-20T12:19:37 - INFO - [Node] Cached "sub-1031.apply_topup_to_SBref" - collecting precomputed outputs
+2024-12-20T12:19:37 - INFO - [Node] "sub-1031.apply_topup_to_SBref" found cached.
