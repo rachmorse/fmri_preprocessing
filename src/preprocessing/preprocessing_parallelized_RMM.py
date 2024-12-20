@@ -23,17 +23,13 @@ from nipype.algorithms.confounds import ComputeDVARS, FramewiseDisplacement
 from nipype.interfaces import spm, utility
 
 root_logger = logging.getLogger()
-root_logger.basicConfig(
-    level=logging.INFO,  # Can change this to only log errors
-    filemode="w",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+root_logger.setLevel(logging.INFO)
 
 # def prepare_data(subject_id, recon_all_path, source_dir):
 #     """
 #     Prepare necessary directories and copy MRI data for a given subject.
 
-#     Parameters:
+#     Args:
 #     subject_id (str): The identifier for the subject whose data is being prepared.
 #     recon_all_path (str): The directory path for recon_all data storage.
 #     subject_reconall (str): The directory where each subject's recon-all is.
@@ -91,7 +87,7 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
 
     completed_subjects = []
 
-    print("\n\\FMRI TO STANDARD\n\n")
+    print("\n\nFMRI TO STANDARD\n\n")
 
     try:
         # Define the workflow to get the acparams file
@@ -143,7 +139,7 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
     This function converts intermediate files, sets input paths, and performs
     SPM coregistration. It logs any errors encountered during execution.
 
-    Parameters:
+    Args:
     subject_id (str): The identifier for the subject being processed.
     root_path (str): The root path for preprocessing.
     fmri2standard_folder (str): Directory for storing fMRI to standard transformations.
@@ -236,7 +232,7 @@ def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_
     This function prepares paths, creates necessary directories, and executes
     a mask extraction script. It logs any errors encountered during the process.
 
-    Parameters:
+    Args:
     subject_id (str): The identifier for the subject being processed.
     root_path (str): The root path for data storage.
     fmri2standard_folder (str): Directory for fMRI to standard transformations.
@@ -304,7 +300,7 @@ def run_nuisance_regression(subject_id, root_path):
     This function sets up a workflow for removing nuisance signals from fMRI data
     and logs any errors during the process.
 
-    Parameters:
+    Args:
     subject_id (str): The identifier for the subject being processed.
     root_path (str): The root path for data storage.
 
@@ -364,7 +360,7 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
     This function sets up the necessary files, decompresses them, and runs
     the SPM normalization process. Errors during this process are logged.
 
-    Parameters:
+    Args:
     subject_id (str): The identifier for the subject being processed.
     root_path (str): The root path for data storage.
     bids_path (str): The path to the BIDS folder.
@@ -454,7 +450,7 @@ def apply_nuisance_correction(subject_id, root_path):
     for regressing out nuisance signals from the data. It logs any errors during
     the process.
 
-    Parameters:
+    Args:
     subject_id (str): Identifier for the subject being processed.
     root_path (str): The root path for preprocessing.
 
@@ -546,7 +542,7 @@ def fmri_quality_control(
     This function calculates framewise displacement and sets up the
     brain mask and DVARS workflow. Errors during the process are logged.
 
-    Parameters:
+    Args:
     subject_id (str): Identifier for the subject being processed.
     root_path (str): The root path for data storage.
     fmri2standard_path (str): The path to the fMRI to standard transformations.
@@ -662,7 +658,7 @@ def fmri_quality_control(
 def initialize_preprocessing_dirs(bids_dir, processed_directory):
     """Initialize directories and retrieve the list of subjects to process.
 
-    Parameters:
+    Args:
         bids_dir (str): Directory containing the BIDS datasets.
         processed_directory (str): Directory containing processed data.
 
@@ -672,12 +668,61 @@ def initialize_preprocessing_dirs(bids_dir, processed_directory):
     subjects_to_process = set(os.listdir(bids_dir))
     done = set(os.listdir(processed_directory))
 
-    subjects_to_process -= done  # Subtract processed subjects
+    print(f"Subjects in BIDS directory: {subjects_to_process}")
+    print(f"Processed subjects: {done}")
+
+    subjects_to_process -= done
     subjects_to_process.discard(".heudiconv")
     subjects_to_process.discard("error_heurdiconv.sh")
 
+    print(f"Subjects to process (after filtering): {subjects_to_process}")
+
     return subjects_to_process
 
+
+def initialize_preprocessing_dirs(bids_dir, root_path):
+    """Initialize directories and determine subjects needing processing.
+
+    Args:
+        bids_dir (str): Directory containing the BIDS datasets.
+        root_path (str): Root path of preprocessed data.
+
+    Returns:
+        set: A set containing identifiers of subjects yet to be processed.
+    """
+
+    def is_processed(subject_id, root_path) -> bool:
+        """Check if a subject has all the required files for processing."""
+        paths = {
+            "motion": f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf.nii.gz.par",
+            "sbref_native": f"{root_path}/fmri2standard/{subject_id}/spm_coregister2T1_sbref/{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
+            "bold_native": f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
+            "bold_MNI": f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz",
+            "nuisance": f"{root_path}/nuisance_correction/{subject_id}/merge_nuisance_txt/all_nuisances.txt",
+            "sbref_MNI_1": f"{root_path}/normalization/{subject_id}/w{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii",
+            "sbref_MNI_2": f"{root_path}/normalization/{subject_id}/w{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
+            "framew": f"{root_path}/QC/{subject_id}/framewise_displ.txt",
+        }
+
+        # Check for existence of files
+        return all([os.path.exists(path) for path in paths.values()])
+
+    subjects_to_process = set()
+
+    for subject_id in os.listdir(bids_dir):
+
+        subject_path = os.path.join(bids_dir, subject_id)
+        print(subject_path, os.path.exists(subject_path))
+        if os.path.isdir(subject_path):
+            subjects_to_process.add(subject_id)
+
+    # Filter to find subjects that still need processing
+    subjects_needing_processing = {
+        subject_id for subject_id in subjects_to_process
+        if not is_processed(subject_id, root_path)
+    }
+
+    return subjects_needing_processing
 
 def change_logger_file(file_name: str):
     """Configure the logging settings for a specific processing step.
@@ -685,15 +730,17 @@ def change_logger_file(file_name: str):
     This function sets up a logging configuration that writes logs to a file
     named after the specific step being processed.
 
-    Parameters:
-    step_name (str): The name of the processing step to log.
+    Args:
+        step_name (str): The name of the processing step to log.
     """
+    root_logger = logging.getLogger()
+    
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
-        
-    log_formatter = logging.LoggingFormatterTZISO("%(asctime)s - %(levelname)s - %(message)s")
 
-    file_handler = logging.FileHandler(f"{file_name}.log")
+    log_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%dT%H:%M:%S")
+
+    file_handler = logging.FileHandler(f"{file_name}.log", mode="w")
     file_handler.setFormatter(log_formatter)
     root_logger.addHandler(file_handler)
 
@@ -731,6 +778,7 @@ def main():
     fmri2standard_path = os.path.join(root_path, fmri2standard_folder)
     nuisance_correction_path = os.path.join(root_path, "nuisance_correction")
     bids_dir = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
+
     processed_directory = "/home/rachel/Desktop/institute/UB/Superagers/MRI/processed_data/fMRI-preprocessed_tp2"
     # Only needed with copy step 
     # source_dir = os.path.join("/home/rachel/Desktop/institute/UB/Superagers/MRI/freesurfer-reconall")
@@ -747,6 +795,7 @@ def main():
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
     subjects_to_process = initialize_preprocessing_dirs(bids_dir, processed_directory)
     
+    print(f"Subjects to process: {subjects_to_process}")
     ######################################## 
     #### Run the preprocessing workflow ####
     ######################################## 

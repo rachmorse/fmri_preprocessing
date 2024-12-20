@@ -1,0 +1,31 @@
+2024-12-20T10:47:34 - INFO - Workflow sub-1031 settings: ['check', 'execution', 'logging', 'monitoring']
+2024-12-20T10:47:34 - INFO - Running serially.
+2024-12-20T10:47:34 - INFO - [Node] Setting-up "sub-1031.Mean_SEgfm_AP" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Mean_SEgfm_AP".
+2024-12-20T10:47:34 - INFO - [Node] Executing "Mean_SEgfm_AP" <nipype.interfaces.fsl.maths.MeanImage>
+2024-12-20T10:47:35 - INFO - [Node] Finished "Mean_SEgfm_AP", elapsed time 0.715712s.
+2024-12-20T10:47:35 - INFO - [Node] Setting-up "sub-1031.eliminate_first_scans" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/eliminate_first_scans".
+2024-12-20T10:47:35 - INFO - [Node] Executing "eliminate_first_scans" <nipype.interfaces.fsl.utils.ExtractROI>
+2024-12-20T10:49:17 - INFO - [Node] Finished "eliminate_first_scans", elapsed time 102.437963s.
+2024-12-20T10:49:17 - INFO - [Node] Setting-up "sub-1031.Merge_ap_pa_inputs" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Merge_ap_pa_inputs".
+2024-12-20T10:49:17 - INFO - [Node] Cached "sub-1031.Merge_ap_pa_inputs" - collecting precomputed outputs
+2024-12-20T10:49:17 - INFO - [Node] "sub-1031.Merge_ap_pa_inputs" found cached.
+2024-12-20T10:49:17 - INFO - [Node] Setting-up "sub-1031.mask_T1" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/mask_T1".
+2024-12-20T10:49:17 - INFO - [Node] Executing "mask_T1" <nipype.interfaces.fsl.preprocess.BET>
+2024-12-20T10:49:24 - INFO - [Node] Finished "mask_T1", elapsed time 7.399912s.
+2024-12-20T10:49:24 - INFO - [Node] Setting-up "sub-1031.vol2vol" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/vol2vol".
+2024-12-20T10:49:24 - INFO - [Node] Cached "sub-1031.vol2vol" - collecting precomputed outputs
+2024-12-20T10:49:24 - INFO - [Node] "sub-1031.vol2vol" found cached.
+2024-12-20T10:49:24 - INFO - [Node] Setting-up "sub-1031.Corregister_SBref2SEgfm" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Corregister_SBref2SEgfm".
+2024-12-20T10:49:24 - INFO - [Node] Outdated cache found for "sub-1031.Corregister_SBref2SEgfm".
+2024-12-20T10:49:24 - INFO - [Node] Executing "Corregister_SBref2SEgfm" <nipype.interfaces.fsl.preprocess.FLIRT>
+2024-12-20T10:49:30 - INFO - [Node] Finished "Corregister_SBref2SEgfm", elapsed time 5.6466709999999996s.
+2024-12-20T10:49:30 - INFO - [Node] Setting-up "sub-1031.Merge_SEgfm_AP_PA" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/Merge_SEgfm_AP_PA".
+2024-12-20T10:49:30 - INFO - [Node] Executing "Merge_SEgfm_AP_PA" <nipype.interfaces.fsl.utils.Merge>
+2024-12-20T10:49:31 - INFO - [Node] Finished "Merge_SEgfm_AP_PA", elapsed time 1.096005s.
+2024-12-20T10:49:31 - INFO - [Node] Setting-up "sub-1031.binarize_mask" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/binarize_mask".
+2024-12-20T10:49:31 - INFO - [Node] Outdated cache found for "sub-1031.binarize_mask".
+2024-12-20T10:49:31 - INFO - [Node] Executing "binarize_mask" <nipype.interfaces.fsl.maths.UnaryMaths>
+2024-12-20T10:49:33 - INFO - [Node] Finished "binarize_mask", elapsed time 1.377376s.
+2024-12-20T10:49:33 - INFO - [Node] Setting-up "sub-1031.realign_fmri2SBref" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1031/realign_fmri2SBref".
+2024-12-20T10:49:33 - INFO - [Node] Outdated cache found for "sub-1031.realign_fmri2SBref".
+2024-12-20T10:49:33 - INFO - [Node] Executing "realign_fmri2SBref" <nipype.interfaces.fsl.preprocess.MCFLIRT>
