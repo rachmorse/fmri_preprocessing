@@ -776,7 +776,7 @@ def main():
 
     # Step 1.
     # Setup logging for fMRI to standard transformation
-    change_logger_file("log_transform_fmri_to_standard")
+    change_logger_file("log_01_transform_fmri_to_standard")
 
     # Initialize a list to collect all transformation results
     all_results = []
@@ -793,27 +793,34 @@ def main():
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation
     with Pool(6) as pool:
         results = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
-        all_results.extend(results)  # Extend the list with results
+        for result in results:
+            if isinstance(result, list):
+                all_results.extend(result)  # Flatten the list
+            else:
+                all_results.append(result)
 
     # Identify subjects ready for coregistration, excluding those with errors
-    coregistration_list = [item for sublist in all_results for item in sublist]
+    coregistration_list = all_results
 
     # Step 2.
     # Setup logging for coregistration
-    change_logger_file("log_execute_coregistration")
+    change_logger_file("log_02_execute_coregistration")
 
     # Perform coregistration on the filtered list of subjects
+    all_results = []  # Reset results for the next phase
     for subject in coregistration_list:
         results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
-        all_results.extend(results) 
+        if isinstance(result, list):
+            all_results.extend(result)
+        else:
+            all_results.append(result)
 
     # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
-    extract_wm_csf_masks_list = [item for sublist in all_results for item in sublist]
-    print(extract_wm_csf_masks_list)
+    extract_wm_csf_masks_list = all_results
 
     # Step 3a.
     # Setup logging for WM and CSF mask extraction
-    change_logger_file("log_extract_wm_csf_masks")
+    change_logger_file("log_03a_extract_wm_csf_masks")
 
     # Apply nuisance correction initial step using multiprocessing
     transform_partial_extract_wm_csf_masks = partial(
@@ -823,40 +830,50 @@ def main():
         recon_all_path=recon_all_path,
     )
     # Use multiprocessing Pool to apply the function
+    all_results = []  # Reset results for the next phase
     with Pool(os.cpu_count()) as pool:
         results = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
-        all_results.extend(results) 
+        if isinstance(result, list):
+                all_results.extend(result)
+        else:
+            all_results.append(result)
 
     # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
-    nuisance_regression_list = [item for sublist in all_results for item in sublist]
+    nuisance_regression_list = all_results
 
     # Step 3b.
     # Setup logging for nuisance regression
-    change_logger_file("log_run_nuisance_regression")
+    change_logger_file("log_03b_run_nuisance_regression")
 
     # Execute advanced nuisance regression
     for subject in nuisance_regression_list:
         results = run_nuisance_regression(subject, root_path)
-        all_results.extend(results) 
+        if isinstance(result, list):
+            all_results.extend(result)
+        else:
+            all_results.append(result)
 
     # Identify subjects needing MNI normalization to run (`mni_normalization`), excluding those with errors from `run_nuisance_regression`
-    mni_normalization_list = [item for sublist in all_results for item in sublist]
+    mni_normalization_list = all_results
 
     # Step 4.
     # Setup logging for MNI normalization
-    change_logger_file("log_mni_normalization")
+    change_logger_file("log_04_mni_normalization")
 
     # Perform MNI normalization using multiprocessing
     for subject in mni_normalization_list:
         results = mni_normalization(subject, root_path, bids_path, fmri2standard_path)
-        all_results.extend(results) 
+        if isinstance(result, list):
+            all_results.extend(result)
+        else:
+            all_results.append(result)
 
     # Identify subjects needing nuisance regression removal to run (`apply_nuisance_correction`), excluding those with errors from `mni_normalization`
-    regression_list = [item for sublist in all_results for item in sublist]
+    regression_list = all_results
 
     # Step 5.
     # Setup logging for nuisance correction application
-    change_logger_file("log_apply_nuisance_correction")
+    change_logger_file("log_05_apply_nuisance_correction")
 
     ###### NOTE because I divided step 5 into two parts, ask Maria if both of these parts require parallelization. Remove if not needed
     # Apply nuisance correction using multiprocessing
@@ -864,14 +881,17 @@ def main():
 
     with Pool(8) as pool:
         results = pool.map(transform_partial_apply_nuisance_correction, regression_list)
-        all_results.extend(results)
+        if isinstance(result, list):
+            all_results.extend(result)
+        else:
+            all_results.append(result)
 
     # Identify subjects needing fMRI quality control to run (`fmri_quality_control`), excluding those with errors from `apply_nuisance_correction`
-    qc_list = [item for sublist in all_results for item in sublist]
+    qc_list = all_results
 
     # Step 6.
     # Setup logging for fMRI quality control
-    change_logger_file("log_fmri_quality_control")
+    change_logger_file("log_06_fmri_quality_control")
 
     # Perform fMRI quality control using multiprocessing
     transform_partial_fmri_quality_control = partial(
