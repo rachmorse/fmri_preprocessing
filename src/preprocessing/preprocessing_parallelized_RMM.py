@@ -22,6 +22,13 @@ from nipype import Node, Workflow
 from nipype.algorithms.confounds import ComputeDVARS, FramewiseDisplacement
 from nipype.interfaces import spm, utility
 
+root_logger = logging.getLogger()
+root_logger.basicConfig(
+    level=logging.INFO,  # Can change this to only log errors
+    filemode="w",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+
 # def prepare_data(subject_id, recon_all_path, source_dir):
 #     """
 #     Prepare necessary directories and copy MRI data for a given subject.
@@ -65,16 +72,16 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
     space where each volume is aligned with the first. It also prepares
     required data and logs any errors encountered.
 
-    Parameters:
-    subject_id (str): The identifier for the subject being processed.
-    root_path (str): The root path for the preprocessing workspace.
-    bids_path (str): The path to the shared BIDS folder.
-    recon_all_path (str): The path to the recon_all directory.
-    acparams_file (str): The path to the acparams.txt file.
-    write_graph (bool): Whether to write a workflow graph. Defaults to False.
+    Args:
+        subject_id (str): The identifier for the subject being processed.
+        root_path (str): The root path for the preprocessing workspace.
+        bids_path (str): The path to the shared BIDS folder.
+        recon_all_path (str): The path to the recon_all directory.
+        acparams_file (str): The path to the acparams.txt file.
+        write_graph (bool): Whether to write a workflow graph. Defaults to False.
 
     Returns:
-    list: A list of subjects that have completed the transformation.
+        list: A list of subjects that have completed the transformation.
     """
     print("##################################################")
     print(f"Processing subject: {subject_id}")
@@ -672,7 +679,7 @@ def initialize_preprocessing_dirs(bids_dir, processed_directory):
     return subjects_to_process
 
 
-def setup_logging(step_name):
+def change_logger_file(file_name: str):
     """Configure the logging settings for a specific processing step.
 
     This function sets up a logging configuration that writes logs to a file
@@ -681,13 +688,14 @@ def setup_logging(step_name):
     Parameters:
     step_name (str): The name of the processing step to log.
     """
-    log_file = f"{step_name}_logs.log"
-    logging.basicConfig(
-        level=logging.INFO,  # Can change this to only log errors
-        filename=log_file,
-        filemode="w",
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
+    if root_logger.hasHandlers():
+        root_logger.handlers.clear()
+        
+    log_formatter = logging.LoggingFormatterTZISO("%(asctime)s - %(levelname)s - %(message)s")
+
+    file_handler = logging.FileHandler(f"{file_name}.log")
+    file_handler.setFormatter(log_formatter)
+    root_logger.addHandler(file_handler)
 
 
 def main():
@@ -709,9 +717,9 @@ def main():
     Paths for inputs and logs are defined relative to the workflow's root directory.
     """
     # Setup logging to file and console
-    logging.basicConfig(
-        level=logging.ERROR, filename="logs.log", filemode="w", format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    # logging.basicConfig(
+    #     level=logging.ERROR, filename="logs.log", filemode="w", format="%(asctime)s - %(levelname)s - %(message)s"
+    # )
 
     # Define all paths and directories for the preprocessing workflow
     root_path = "/home/rachel/Desktop/Preprocessing"
@@ -745,7 +753,7 @@ def main():
 
     # Step 1.
     # Setup logging for fMRI to standard transformation
-    setup_logging("transform_fmri_to_standard")
+    change_logger_file("transform_fmri_to_standard")
 
     # Define the partial function with fixed arguments
     transform_partial_fmri_to_standard = partial(
@@ -765,7 +773,7 @@ def main():
 
     # Step 2.
     # Setup logging for coregistration
-    setup_logging("execute_coregistration")
+    change_logger_file("execute_coregistration")
 
     # Perform coregistration on the filtered list of subjects
     for subject in coregistration_list:
@@ -776,7 +784,7 @@ def main():
 
     # Step 3a.
     # Setup logging for WM and CSF mask extraction
-    setup_logging("extract_wm_csf_masks")
+    change_logger_file("extract_wm_csf_masks")
 
     # Apply nuisance correction initial step using multiprocessing
     transform_partial_extract_wm_csf_masks = partial(
@@ -794,7 +802,7 @@ def main():
 
     # Step 3b.
     # Setup logging for nuisance regression
-    setup_logging("run_nuisance_regression")
+    change_logger_file("run_nuisance_regression")
 
     # Execute advanced nuisance regression
     for subject in nuisance_regression_list:
@@ -806,7 +814,7 @@ def main():
 
     # Step 4.
     # Setup logging for MNI normalization
-    setup_logging("mni_normalization")
+    change_logger_file("mni_normalization")
 
     # Perform MNI normalization using multiprocessing
     for subject in mni_normalization_list:
@@ -817,7 +825,7 @@ def main():
 
     # Step 5.
     # Setup logging for nuisance correction application
-    setup_logging("apply_nuisance_correction")
+    change_logger_file("apply_nuisance_correction")
 
     ###### NOTE because I divided step 5 into two parts, ask Maria if both of these parts require parallelization. Remove if not needed
     # Apply nuisance correction using multiprocessing
@@ -831,7 +839,7 @@ def main():
 
     # Step 6.
     # Setup logging for fMRI quality control
-    setup_logging("fmri_quality_control")
+    change_logger_file("fmri_quality_control")
 
     # Perform fMRI quality control using multiprocessing
     transform_partial_fmri_quality_control = partial(
