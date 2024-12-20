@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import subprocess
+from typing import Optional, Set
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
@@ -68,8 +69,7 @@ root_logger.setLevel(logging.INFO)
 #     except Exception as e:
 #         logging.error("Error copying aseg.mgz & brain.mgz for subject %s: %s", subject_id, e)
 
-
-def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path, acparams_file, write_graph=False):
+def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path, acparams_file, write_graph=False) -> str:
     """Transform fMRI data to a standard space for a given subject.
 
     This function sets up and runs a workflow to align fMRI data to standard
@@ -92,8 +92,6 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
     print("##################################################")
 
     # prepare_data(subject_id)
-
-    completed_subjects = []
 
     print("\n\nFMRI TO STANDARD\n\n")
 
@@ -132,13 +130,11 @@ def transform_fmri_to_standard(subject_id, root_path, bids_path, recon_all_path,
         # Run the workflow
         fmri2t1_wf.run()
 
-        completed_subjects.append(subject_id)
-
     except Exception as e:
         logging.error("Error in fMRI to Standard Workflow for subject %s: %s", subject_id, e)
-        return completed_subjects
+        return
 
-    return completed_subjects
+    return subject_id
 
 
 def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1):
@@ -157,8 +153,6 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
     Returns:
         list: A list of subjects that have completed coregistration.
     """
-    completed_subjects = []
-
     try:
         # Create intermediate unzipped .nii files using subprocess
         subprocess.run(
@@ -185,7 +179,7 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
             fmri2standard_folder,
             subject_id,
             "spm_coregister2T1_sbref",
-            f"{subject_id}_ses-02_run-01_rest_sbref_ap_flirt_corrected_coregistered2T1.nii",
+            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii",
         )
 
         bold2T1_path = os.path.join(
@@ -193,7 +187,7 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
             fmri2standard_folder,
             subject_id,
             "spm_coregister2T1_bold",
-            f"{subject_id}_ses-02_run-01_rest_bold_ap_roi_mcf_corrected_coregistered2T1.nii",
+            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii",
         )
 
         # SPM coregistration: Align BOLD to standard T1
@@ -226,13 +220,11 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
             check=True,
         )
 
-        completed_subjects.append(subject_id)
-
     except Exception as e:
         logging.error("Error during SPM coregistration for subject %s: %s", subject_id, e)
-        return completed_subjects
+        return
 
-    return completed_subjects
+    return subject_id
 
 
 def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_path):
@@ -250,8 +242,6 @@ def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_
     Returns:
         list: A list of subjects that have completed the mask extraction.
     """
-    completed_subjects = []
-
     print("\n\nNUISANCE CORRECTION\n\n")
 
     try:
@@ -292,15 +282,15 @@ def extract_wm_csf_masks(subject_id, root_path, fmri2standard_folder, recon_all_
                 check=True,
             )
 
-            completed_subjects.append(subject_id)
-
         except subprocess.CalledProcessError as e:
             logging.error("Error during WM and CSF mask extraction for subject %s: %s", subject_id, e)
+            return
 
     except Exception as e:
         logging.error("Error in extracting WM and CSF masks for subject %s: %s", subject_id, e)
+        return
 
-    return completed_subjects
+    return subject_id
 
 
 def run_nuisance_regression(subject_id, root_path):
@@ -316,8 +306,6 @@ def run_nuisance_regression(subject_id, root_path):
     Returns:
         list: A list of subjects that have completed the nuisance regression.
     """
-    completed_subjects = []
-
     try:
         wf_reg = get_nuisance_regressors_wf(
             outdir=os.path.join(root_path, "nuisance_correction"), subject_id=subject_id, timepoints=740
@@ -355,12 +343,11 @@ def run_nuisance_regression(subject_id, root_path):
         # Writes the graph and runs the workflow
         wf_reg.run()
 
-        completed_subjects.append(subject_id)
-
     except Exception as e:
         logging.error("Error in nuisance workflow for subject %s: %s", subject_id, e)
+        return
 
-    return completed_subjects
+    return subject_id
 
 
 def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
@@ -378,8 +365,6 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
     Returns:
         list: A list of subjects that have completed MNI normalization.
     """
-    completed_subjects = []
-
     print("\n\nMNI NORMALIZATION\n\n")
     try:
         # Create necessary directory for normalization
@@ -443,15 +428,14 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
         MNI.inputs.write_bounding_box = [[-90, -126, -72], [90, 90, 108]]
         MNI.run()
 
-        completed_subjects.append(subject_id)
-
     except Exception as e:
         logging.error("Error during MNI Normalization for subject %s: %s", subject_id, e)
+        return
     
-    return completed_subjects
+    return subject_id
 
 
-def apply_nuisance_correction(subject_id, root_path):
+def apply_nuisance_correction(subject_id, root_path) -> Optional[str]:
     """Apply nuisance correction for a given subject.
 
     This function handles gzip compression, file movements, and uses FSL tools
@@ -465,8 +449,6 @@ def apply_nuisance_correction(subject_id, root_path):
     Returns:
         list: A list of subjects that have completed nuisance correction.
     """
-    completed_subjects = []
-
     print("\n\nAPPLYING NUISANCE CORRECTION\n\n")
     try:
         # Define paths
@@ -534,12 +516,11 @@ def apply_nuisance_correction(subject_id, root_path):
         os.makedirs(output_directory, exist_ok=True)
         subprocess.run(command_nuisance, check=True)
 
-        completed_subjects.append(subject_id)
-
     except Exception as e:
         logging.error("Error during nuisance correction for subject %s: %s", subject_id, e)
+        return
         
-    return completed_subjects
+    return subject_id
 
 
 def fmri_quality_control(
@@ -562,8 +543,6 @@ def fmri_quality_control(
         list: A list of subjects that have completed the QC process.
     """
     print("\n\nFMRI QC\n\n")
-    completed_subjects = []
-
     try:
         # Create QC directory
         qc_dir = os.path.join(root_path, "QC", subject_id)
@@ -588,7 +567,7 @@ def fmri_quality_control(
 
     except Exception as e:
         logging.error("Error during framewise displacement for subject %s: %s", subject_id, e)
-        return completed_subjects
+        return
 
     try:
         # Set additional paths for QA and brain mask
@@ -630,7 +609,7 @@ def fmri_quality_control(
 
     except Exception as e:
         logging.error("Error in brain mask to BOLD transformation for subject %s: %s", subject_id, e)
-        return completed_subjects
+        return
 
     try:
         # Setup workflow for DVARS computation
@@ -651,16 +630,13 @@ def fmri_quality_control(
 
     except Exception as e:
         logging.error("Error in DVARS computation for subject %s: %s", subject_id, e)
-        return completed_subjects
-
-    # If all steps up to this point are successful, mark the subject as completed
-    completed_subjects.append(subject_id)
+        return
 
     # Cleanup directories to free space
     shutil.rmtree(os.path.join(root_path, bids_path, subject_id), ignore_errors=True)
     shutil.rmtree(os.path.join(recon_all_path, subject_id), ignore_errors=True)
 
-    return completed_subjects
+    return subject_id
 
 
 def initialize_preprocessing_dirs(bids_dir, root_path):
@@ -778,9 +754,6 @@ def main():
     # Setup logging for fMRI to standard transformation
     change_logger_file("log_01_transform_fmri_to_standard")
 
-    # Initialize a list to collect all transformation results
-    all_results = []
-
     # Define the partial function with fixed arguments
     transform_partial_fmri_to_standard = partial(
         transform_fmri_to_standard,
@@ -792,31 +765,24 @@ def main():
 
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation
     with Pool(6) as pool:
-        results = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
-        for result in results:
-            if isinstance(result, list):
-                all_results.extend(result)  # Flatten the list
-            else:
-                all_results.append(result)
+        coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
 
-    # Identify subjects ready for coregistration, excluding those with errors
-    coregistration_list = all_results
+    # Filter out any None values from the results. None gets returned when an error occurs
+    coregistration_list = [subject for subject in coregistration_list if subject is not None]
 
     # Step 2.
     # Setup logging for coregistration
     change_logger_file("log_02_execute_coregistration")
-
+    
     # Perform coregistration on the filtered list of subjects
-    all_results = []  # Reset results for the next phase
+    extract_wm_csf_masks_list = []  # Reset results for the next phase
     for subject in coregistration_list:
         results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
-        if isinstance(result, list):
-            all_results.extend(result)
-        else:
-            all_results.append(result)
+        if results is not None:
+            extract_wm_csf_masks_list.append(results)
 
     # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
-    extract_wm_csf_masks_list = all_results
+    print(extract_wm_csf_masks_list)
 
     # Step 3a.
     # Setup logging for WM and CSF mask extraction
@@ -830,46 +796,34 @@ def main():
         recon_all_path=recon_all_path,
     )
     # Use multiprocessing Pool to apply the function
-    all_results = []  # Reset results for the next phase
     with Pool(os.cpu_count()) as pool:
-        results = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
-        if isinstance(result, list):
-                all_results.extend(result)
-        else:
-            all_results.append(result)
+        nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
     # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
-    nuisance_regression_list = all_results
+    nuisance_regression_list = [subject for subject in nuisance_regression_list if subject is not None]
+    print(nuisance_regression_list)
 
     # Step 3b.
     # Setup logging for nuisance regression
     change_logger_file("log_03b_run_nuisance_regression")
 
     # Execute advanced nuisance regression
+    mni_normalization_list = [] 
     for subject in nuisance_regression_list:
         results = run_nuisance_regression(subject, root_path)
-        if isinstance(result, list):
-            all_results.extend(result)
-        else:
-            all_results.append(result)
-
-    # Identify subjects needing MNI normalization to run (`mni_normalization`), excluding those with errors from `run_nuisance_regression`
-    mni_normalization_list = all_results
+        if results is not None:
+            mni_normalization_list.append(results)
 
     # Step 4.
     # Setup logging for MNI normalization
     change_logger_file("log_04_mni_normalization")
 
     # Perform MNI normalization using multiprocessing
+    regression_list = []
     for subject in mni_normalization_list:
         results = mni_normalization(subject, root_path, bids_path, fmri2standard_path)
-        if isinstance(result, list):
-            all_results.extend(result)
-        else:
-            all_results.append(result)
-
-    # Identify subjects needing nuisance regression removal to run (`apply_nuisance_correction`), excluding those with errors from `mni_normalization`
-    regression_list = all_results
+        if results is not None:
+            regression_list.append(results)
 
     # Step 5.
     # Setup logging for nuisance correction application
@@ -880,14 +834,9 @@ def main():
     transform_partial_apply_nuisance_correction = partial(apply_nuisance_correction, root_path=root_path)
 
     with Pool(8) as pool:
-        results = pool.map(transform_partial_apply_nuisance_correction, regression_list)
-        if isinstance(result, list):
-            all_results.extend(result)
-        else:
-            all_results.append(result)
+        qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
-    # Identify subjects needing fMRI quality control to run (`fmri_quality_control`), excluding those with errors from `apply_nuisance_correction`
-    qc_list = all_results
+    qc_list = [subject for subject in qc_list if subject is not None] 
 
     # Step 6.
     # Setup logging for fMRI quality control
@@ -904,7 +853,12 @@ def main():
     )
 
     with Pool(8) as pool:
-        pool.map(transform_partial_fmri_quality_control, qc_list)
+        final_results = pool.map(transform_partial_fmri_quality_control, qc_list)
+
+    final_results = [subject for subject in final_results if subject is not None]
+
+    failed_subjects = subjects_to_process - set(final_results)
+    print(f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"+ "\n".join(failed_subjects))
 
 
 if __name__ == "__main__":

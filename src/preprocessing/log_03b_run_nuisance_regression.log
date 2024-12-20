@@ -1,0 +1,23 @@
+2024-12-20T15:26:26 - INFO - Workflow sub-1084 settings: ['check', 'execution', 'logging', 'monitoring']
+2024-12-20T15:26:26 - INFO - Running serially.
+2024-12-20T15:26:26 - INFO - [Node] Setting-up "sub-1084.Merge_wm_csf" in "/home/rachel/Desktop/Preprocessing/nuisance_correction/sub-1084/Merge_wm_csf".
+2024-12-20T15:26:26 - INFO - [Node] Executing "Merge_wm_csf" <nipype.interfaces.utility.base.Merge>
+2024-12-20T15:26:26 - INFO - [Node] Finished "Merge_wm_csf", elapsed time 0.000231s.
+2024-12-20T15:26:26 - INFO - [Node] Setting-up "sub-1084.motion_regressors_txt" in "/home/rachel/Desktop/Preprocessing/nuisance_correction/sub-1084/motion_regressors_txt".
+2024-12-20T15:26:26 - INFO - [Node] Executing "motion_regressors_txt" <nipype.interfaces.utility.wrappers.Function>
+2024-12-20T15:26:26 - INFO - [Node] Finished "motion_regressors_txt", elapsed time 0.009293s.
+2024-12-20T15:26:26 - INFO - [Node] Setting-up "sub-1084.cosine_filter" in "/home/rachel/Desktop/Preprocessing/nuisance_correction/sub-1084/cosine_filter".
+2024-12-20T15:26:26 - INFO - [Node] Executing "cosine_filter" <nipype.interfaces.utility.wrappers.Function>
+2024-12-20T15:26:26 - INFO - [Node] Finished "cosine_filter", elapsed time 0.00508s.
+2024-12-20T15:26:26 - INFO - [Node] Setting-up "sub-1084.AcompCor_mask" in "/home/rachel/Desktop/Preprocessing/nuisance_correction/sub-1084/AcompCor_mask".
+2024-12-20T15:26:26 - INFO - [Node] Executing "AcompCor_mask" <nipype.algorithms.confounds.ACompCor>
+2024-12-20T15:27:00 - INFO - [Node] Finished "AcompCor_mask", elapsed time 33.777607s.
+2024-12-20T15:27:00 - INFO - [Node] Setting-up "sub-1084.Merge_txt_inputs" in "/home/rachel/Desktop/Preprocessing/nuisance_correction/sub-1084/Merge_txt_inputs".
+2024-12-20T15:27:00 - INFO - [Node] Executing "Merge_txt_inputs" <nipype.interfaces.utility.base.Merge>
+2024-12-20T15:27:00 - INFO - [Node] Finished "Merge_txt_inputs", elapsed time 0.000151s.
+2024-12-20T15:27:00 - INFO - [Node] Setting-up "sub-1084.merge_nuisance_txt" in "/home/rachel/Desktop/Preprocessing/nuisance_correction/sub-1084/merge_nuisance_txt".
+2024-12-20T15:27:00 - INFO - [Node] Executing "merge_nuisance_txt" <nipype.interfaces.utility.wrappers.Function>
+2024-12-20T15:27:00 - INFO - [Node] Finished "merge_nuisance_txt", elapsed time 0.017759s.
+2024-12-20T15:27:00 - INFO - [Node] Setting-up "sub-1084.filter_regressors_bold" in "/home/rachel/Desktop/Preprocessing/nuisance_correction/sub-1084/filter_regressors_bold".
+2024-12-20T15:27:00 - INFO - [Node] Executing "filter_regressors_bold" <nipype.interfaces.fsl.utils.FilterRegressor>
+2024-12-20T15:29:17 - INFO - [Node] Finished "filter_regressors_bold", elapsed time 137.372106s.
