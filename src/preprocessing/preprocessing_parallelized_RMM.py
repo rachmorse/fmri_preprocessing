@@ -147,54 +147,59 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
         list: A list of subjects that have completed coregistration.
     """
     try:
-            # Define paths
-            sbref_dir = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_sbref")
-            bold_dir = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_bold")
-            anat_dir = os.path.join(bids_path, subject_id, "ses-02", "anat")
+        # Define paths
+        sbref_dir = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_sbref")
+        bold_dir = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_bold")
+        anat_dir = os.path.join(bids_path, subject_id, "ses-02", "anat")
 
-            # Create directories if they don't exist
-            os.makedirs(sbref_dir, exist_ok=True)
-            os.makedirs(bold_dir, exist_ok=True)
+        # Create directories if they don't exist
+        os.makedirs(sbref_dir, exist_ok=True)
+        os.makedirs(bold_dir, exist_ok=True)
 
-            # Unzip and prepare files
-            sbref_source = os.path.join(root_path, fmri2standard_folder, subject_id, "apply_topup_to_SBref",
-                                        f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected.nii.gz")
-            sbref_dest = os.path.join(sbref_dir,
-                                    f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii")
-            shutil.copy(sbref_source, sbref_dest + ".gz")
-            subprocess.run(["gunzip", "-f", sbref_dest + ".gz"], check=True)
-            
-            t1w_source = os.path.join(anat_dir, f"{subject_id}_ses-02_run-01_T1w.nii.gz")
-            t1w_dest = os.path.join(anat_dir, f"{subject_id}_ses-02_run-01_T1w.nii")
+        # Unzip and prepare files
+        sbref_source = os.path.join(root_path, fmri2standard_folder, subject_id, "apply_topup_to_SBref",
+                                    f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected.nii.gz")
+        sbref_dest = os.path.join(sbref_dir,
+                                  f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz")
+        shutil.copy(sbref_source, sbref_dest)
+        subprocess.run(["gunzip", "-f", sbref_dest], check=True)
+        sbref_dest_uncompressed = sbref_dest.replace(".nii.gz", ".nii")
+
+        t1w_source = os.path.join(anat_dir, f"{subject_id}_ses-02_run-01_T1w.nii.gz")
+        # Copy and decompress only once, and ensure it's not deleted prematurely
+        t1w_dest = os.path.join(anat_dir, f"{subject_id}_ses-02_run-01_T1w.nii")
+        if not os.path.exists(t1w_dest):
             shutil.copy(t1w_source, t1w_dest + ".gz")
             subprocess.run(["gunzip", "-f", t1w_dest + ".gz"], check=True)
 
-            bold_source = os.path.join(root_path, fmri2standard_folder, subject_id, "apply_topup",
-                                    f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected.nii.gz")
-            bold_dest = os.path.join(bold_dir,
-                                    f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii")
-            shutil.copy(bold_source, bold_dest + ".gz")
-            subprocess.run(["gunzip", "-f", bold_dest + ".gz"], check=True)
+        bold_source = os.path.join(root_path, fmri2standard_folder, subject_id, "apply_topup",
+                                   f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected.nii.gz")
+        bold_dest = os.path.join(bold_dir,
+                                 f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz")
+        shutil.copy(bold_source, bold_dest)
+        subprocess.run(["gunzip", "-f", bold_dest], check=True)
+        bold_dest_uncompressed = bold_dest.replace(".nii.gz", ".nii")
 
-            # SPM coregistration: Align BOLD to standard T1
-            coreg_EPI2T1.inputs.target = t1w_dest
-            coreg_EPI2T1.inputs.source = sbref_dest
-            coreg_EPI2T1.inputs.jobtype = "estimate"
-            coreg_EPI2T1.inputs.apply_to_files = [bold_dest]
+        # SPM coregistration: Align BOLD to standard T1
+        coreg_EPI2T1.inputs.target = t1w_dest
+        coreg_EPI2T1.inputs.source = sbref_dest_uncompressed
+        coreg_EPI2T1.inputs.jobtype = "estimate"
+        coreg_EPI2T1.inputs.apply_to_files = [bold_dest_uncompressed]
 
-            coreg_EPI2T1.run()
+        coreg_EPI2T1.run()
 
-            # Zip back and clean up the original files
-            subprocess.run(["gzip", sbref_dest], check=True)
-            if os.path.exists(sbref_dest):
-                os.remove(sbref_dest)
+        # Zip back and clean up the original files AFTER all processing is done
+        subprocess.run(["gzip", sbref_dest_uncompressed], check=True)
+        subprocess.run(["gzip", bold_dest_uncompressed], check=True)
+        if os.path.exists(sbref_dest):
+            os.remove(sbref_dest)
 
-            if os.path.exists(t1w_dest):
-                os.remove(t1w_dest)
+        if os.path.exists(t1w_dest):
+            os.remove(t1w_dest)
 
-            subprocess.run(["gzip", bold_dest], check=True)
-            if os.path.exists(bold_dest):
-                os.remove(bold_dest)
+        subprocess.run(["gzip", bold_dest], check=True)
+        if os.path.exists(bold_dest):
+            os.remove(bold_dest)
 
     except Exception as e:
         logging.error("Error during SPM coregistration for subject %s: %s", subject_id, e)
@@ -457,7 +462,6 @@ def apply_nuisance_correction(subject_id, root_path) -> Optional[str]:
 
         # Perform gzip compression and remove the NII file
         subprocess.run(["gzip", "-f", new_name_nii], check=True)
-        # os.remove(new_name_nii)
         shutil.move(nuisance_output, native_name)
 
         # Define the path for the compressed file
@@ -726,33 +730,40 @@ def main():
     #### Run the preprocessing workflow ####
     ########################################
 
-    # Step 1.
-    # Setup logging for fMRI to standard transformation
-    change_logger_file("log_01_transform_fmri_to_standard")
+    # # Step 1.
+    # # Setup logging for fMRI to standard transformation
+    # change_logger_file("log_01_transform_fmri_to_standard")
 
-    # Define the partial function with fixed arguments
-    transform_partial_fmri_to_standard = partial(
-        transform_fmri_to_standard,
-        root_path=root_path,
-        bids_path=bids_path,
-        recon_all_path=recon_all_path,
-        acparams_file=acparams_file,
-    )
+    # # Define the partial function with fixed arguments
+    # transform_partial_fmri_to_standard = partial(
+    #     transform_fmri_to_standard,
+    #     root_path=root_path,
+    #     bids_path=bids_path,
+    #     recon_all_path=recon_all_path,
+    #     acparams_file=acparams_file,
+    # )
 
-    # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    with Pool(6) as pool:
-        coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
+    # # Set up a multiprocessing pool to parallelize fMRI standard space transformation
+    # with Pool(6) as pool:
+    #     coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
 
-    # Filter out any None values from the results. None gets returned when an error occurs
-    coregistration_list = [subject for subject in coregistration_list if subject is not None]
+    # # Filter out any None values from the results. None gets returned when an error occurs
+    # coregistration_list = [subject for subject in coregistration_list if subject is not None]
 
     # Step 2.
     # Setup logging for coregistration
     change_logger_file("log_02_execute_coregistration")
 
+    # UNCOMMENT when running the full pipeline and remove repetitive code below 
     # Perform coregistration on the filtered list of subjects
+    # extract_wm_csf_masks_list = []  # Reset results for the next phase
+    # for subject in coregistration_list:
+    #     results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
+    #     if results is not None:
+    #         extract_wm_csf_masks_list.append(results)
+
     extract_wm_csf_masks_list = []  # Reset results for the next phase
-    for subject in coregistration_list:
+    for subject in subjects_to_process:
         results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
         if results is not None:
             extract_wm_csf_masks_list.append(results)
