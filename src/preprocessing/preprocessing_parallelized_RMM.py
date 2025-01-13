@@ -147,71 +147,54 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
         list: A list of subjects that have completed coregistration.
     """
     try:
-        # Create intermediate unzipped .nii files using subprocess
-        subprocess.run(
-            [
-                "bash",
-                "intermediate-files_SPM-coregister2T1_nii-format.sh",
-                "-r",
-                root_path,
-                "-f",
-                fmri2standard_folder,
-                "-b",
-                bids_path,
-                "-s",
-                subject_id,
-                "-m",
-                "to_nii",
-            ],
-            check=True,
-        )
+            # Define paths
+            sbref_dir = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_sbref")
+            bold_dir = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_bold")
+            anat_dir = os.path.join(bids_path, subject_id, "ses-02", "anat")
 
-        # Define paths
-        sbref2T1_path = os.path.join(
-            root_path,
-            fmri2standard_folder,
-            subject_id,
-            "spm_coregister2T1_sbref",
-            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii",
-        )
+            # Create directories if they don't exist
+            os.makedirs(sbref_dir, exist_ok=True)
+            os.makedirs(bold_dir, exist_ok=True)
 
-        bold2T1_path = os.path.join(
-            root_path,
-            fmri2standard_folder,
-            subject_id,
-            "spm_coregister2T1_bold",
-            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii",
-        )
+            # Unzip and prepare files
+            sbref_source = os.path.join(root_path, fmri2standard_folder, subject_id, "apply_topup_to_SBref",
+                                        f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected.nii.gz")
+            sbref_dest = os.path.join(sbref_dir,
+                                    f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii")
+            shutil.copy(sbref_source, sbref_dest + ".gz")
+            subprocess.run(["gunzip", "-f", sbref_dest + ".gz"], check=True)
+            
+            t1w_source = os.path.join(anat_dir, f"{subject_id}_ses-02_run-01_T1w.nii.gz")
+            t1w_dest = os.path.join(anat_dir, f"{subject_id}_ses-02_run-01_T1w.nii")
+            shutil.copy(t1w_source, t1w_dest + ".gz")
+            subprocess.run(["gunzip", "-f", t1w_dest + ".gz"], check=True)
 
-        # SPM coregistration: Align BOLD to standard T1
-        target_path = os.path.join(
-            root_path, bids_path, subject_id, "ses-02", "anat", f"{subject_id}_ses-02_run-01_T1w.nii"
-        )
-        coreg_EPI2T1.inputs.target = target_path
-        coreg_EPI2T1.inputs.source = sbref2T1_path
-        coreg_EPI2T1.inputs.jobtype = "estimate"
-        coreg_EPI2T1.inputs.apply_to_files = [bold2T1_path]
+            bold_source = os.path.join(root_path, fmri2standard_folder, subject_id, "apply_topup",
+                                    f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected.nii.gz")
+            bold_dest = os.path.join(bold_dir,
+                                    f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii")
+            shutil.copy(bold_source, bold_dest + ".gz")
+            subprocess.run(["gunzip", "-f", bold_dest + ".gz"], check=True)
 
-        coreg_EPI2T1.run()
+            # SPM coregistration: Align BOLD to standard T1
+            coreg_EPI2T1.inputs.target = t1w_dest
+            coreg_EPI2T1.inputs.source = sbref_dest
+            coreg_EPI2T1.inputs.jobtype = "estimate"
+            coreg_EPI2T1.inputs.apply_to_files = [bold_dest]
 
-        # Delete intermediate unzipped .nii files using subprocess
-        subprocess.run(
-            [
-                "bash",
-                "intermediate-files_SPM-coregister2T1_nii-format.sh",
-                "-r",
-                root_path,
-                "-f",
-                fmri2standard_folder,
-                "-b",
-                bids_path,
-                "-s",
-                subject_id,
-                "-m",
-                "to_nii_gz",
-            ],
-            check=True,
-        )
+            coreg_EPI2T1.run()
+
+            # Zip back and clean up the original files
+            subprocess.run(["gzip", sbref_dest], check=True)
+            if os.path.exists(sbref_dest):
+                os.remove(sbref_dest)
+
+            if os.path.exists(t1w_dest):
+                os.remove(t1w_dest)
+
+            subprocess.run(["gzip", bold_dest], check=True)
+            if os.path.exists(bold_dest):
+                os.remove(bold_dest)
 
     except Exception as e:
         logging.error("Error during SPM coregistration for subject %s: %s", subject_id, e)
@@ -477,12 +460,8 @@ def apply_nuisance_correction(subject_id, root_path) -> Optional[str]:
         # os.remove(new_name_nii)
         shutil.move(nuisance_output, native_name)
 
-        mni_pre = os.path.join(
-            root_path,
-            "normalization",
-            subject_id,
-            f"w{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz",
-        )
+        # Define the path for the compressed file
+        mni_pre = f"{new_name_nii}.gz"
 
         mni_post = os.path.join(
             root_path,
@@ -719,13 +698,15 @@ def main():
     # Define all paths and directories for the preprocessing workflow
     root_path = "/home/rachel/Desktop/Preprocessing"
     fmri2standard_folder = "fmri2standard"
-    mri_path = "/pool/guttmann/institut/UB/Superagers/MRI"
+    # mri_path = "/pool/guttmann/institut/UB/Superagers/MRI"
+    mri_path = "/home/rachel/Desktop/institute/UB/Superagers/MRI"
     bids_path = os.path.join(mri_path, "BIDS")
+    bids_dir = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
     recon_all_path = os.path.join(mri_path, "freesurfer-reconall")
     acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
     fmri2standard_path = os.path.join(root_path, fmri2standard_folder)
     nuisance_correction_path = os.path.join(root_path, "nuisance_correction")
-    bids_dir = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
+    # bids_dir = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
 
     # Configure MATLAB command
     mlab_cmd = "/usr/local/bin/matlab -nodesktop -nosplash"
@@ -738,6 +719,8 @@ def main():
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
     subjects_to_process = initialize_preprocessing_dirs(bids_dir, root_path)
+
+    print(f"Subjects to process: {subjects_to_process}")
 
     ########################################
     #### Run the preprocessing workflow ####
@@ -829,32 +812,35 @@ def main():
     with Pool(8) as pool:
         qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
+    # with Pool(8) as pool:
+    #       qc_list = pool.map(transform_partial_apply_nuisance_correction, subjects_to_process)
+
     qc_list = [subject for subject in qc_list if subject is not None]
 
-    # Step 6.
-    # Setup logging for fMRI quality control
-    change_logger_file("log_06_fmri_quality_control")
+    # # Step 6.
+    # # Setup logging for fMRI quality control
+    # change_logger_file("log_06_fmri_quality_control")
 
-    # Perform fMRI quality control using multiprocessing
-    transform_partial_fmri_quality_control = partial(
-        fmri_quality_control,
-        root_path=root_path,
-        fmri2standard_path=fmri2standard_path,
-        nuisance_correction_path=nuisance_correction_path,
-        bids_path=bids_path,
-        recon_all_path=recon_all_path,
-    )
+    # # Perform fMRI quality control using multiprocessing
+    # transform_partial_fmri_quality_control = partial(
+    #     fmri_quality_control,
+    #     root_path=root_path,
+    #     fmri2standard_path=fmri2standard_path,
+    #     nuisance_correction_path=nuisance_correction_path,
+    #     bids_path=bids_path,
+    #     recon_all_path=recon_all_path,
+    # )
 
-    with Pool(8) as pool:
-        final_results = pool.map(transform_partial_fmri_quality_control, qc_list)
+    # with Pool(8) as pool:
+    #     final_results = pool.map(transform_partial_fmri_quality_control, qc_list)
 
-    final_results = [subject for subject in final_results if subject is not None]
+    # final_results = [subject for subject in final_results if subject is not None]
 
-    failed_subjects = subjects_to_process - set(final_results)
-    print(
-        f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"
-        + "\n".join(failed_subjects)
-    )
+    # failed_subjects = subjects_to_process - set(final_results)
+    # print(
+    #     f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"
+    #     + "\n".join(failed_subjects)
+    # )
 
 
 if __name__ == "__main__":
