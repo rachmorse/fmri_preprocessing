@@ -1,0 +1,10 @@
+2025-01-14T13:40:34 - DEBUG - Normalization directory: /home/rachel/Desktop/Preprocessing/normalization/sub-1084
+2025-01-14T13:40:34 - DEBUG - Copied T1 file to: /home/rachel/Desktop/Preprocessing/normalization/sub-1084/sub-1084_ses-02_run-01_T1w.nii.gz
+2025-01-14T13:40:34 - DEBUG - Decompressing T1 file: /home/rachel/Desktop/Preprocessing/normalization/sub-1084/sub-1084_ses-02_run-01_T1w.nii.gz
+2025-01-14T13:40:38 - DEBUG - Copied BOLD file to: /home/rachel/Desktop/Preprocessing/normalization/sub-1084/sub-1084_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz
+2025-01-14T13:41:01 - DEBUG - Decompressed BOLD file: /home/rachel/Desktop/Preprocessing/normalization/sub-1084/sub-1084_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii
+2025-01-14T13:41:01 - DEBUG - Copied SBREF file to: /home/rachel/Desktop/Preprocessing/normalization/sub-1084/sub-1084_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz
+2025-01-14T13:41:01 - DEBUG - Decompressed SBREF file: /home/rachel/Desktop/Preprocessing/normalization/sub-1084/sub-1084_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii
+2025-01-14T13:41:01 - DEBUG - Performing MNI normalization with SPM.
+2025-01-14T13:50:24 - DEBUG - Normalization results: <nipype.interfaces.base.support.InterfaceResult object at 0x7f0ae1513950>
+2025-01-14T13:50:24 - DEBUG - Completed MNI normalization for subject sub-1084
