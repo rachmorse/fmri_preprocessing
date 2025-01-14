@@ -1,0 +1,1 @@
+2025-01-14T12:05:37 - ERROR - Error during nuisance correction for subject sub-1084: [Errno 2] No such file or directory: '/home/rachel/Desktop/Preprocessing/nuisance_correction/sub-1084/filter_regressors_bold/sub-1084_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt.nii.gz'

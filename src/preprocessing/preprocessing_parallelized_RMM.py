@@ -99,7 +99,7 @@ def transform_fmri_to_standard(
         # Set the base directory for the workflow
         fmri2t1_wf.base_dir = os.path.join(root_path, "fmri2standard")
 
-        # Directly set inputs like the working code does
+        # Directly set inputs 
         fmri2t1_wf.inputs.input_node.T1_img = (
             f"{bids_path}/{subject_id}/ses-02/anat/{subject_id}_ses-02_run-01_T1w.nii.gz"
         )
@@ -359,16 +359,15 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
         normalization_dir = os.path.join(root_path, "normalization", subject_id)
         os.makedirs(normalization_dir, exist_ok=True)
 
-        # Setup file paths
+        # Setup file paths to T1 images 
         T1_niigz = os.path.join(bids_path, subject_id, "ses-02", "anat", f"{subject_id}_ses-02_run-01_T1w.nii.gz")
         T1_niigzcopy = os.path.join(normalization_dir, f"{subject_id}_ses-02_run-01_T1w.nii.gz")
         T1_nii = os.path.join(normalization_dir, f"{subject_id}_ses-02_run-01_T1w.nii")
-
-        # Copy and decompress T1 image
+        
+        # Copy and decompress T1 images
         shutil.copy(T1_niigz, T1_niigzcopy)
         os.chmod(T1_niigzcopy, 0o644)  # Set permissions to be readable
-        with gzip.open(T1_niigzcopy, "rb") as f_in, open(T1_nii, "wb") as f_out:
-            shutil.copyfileobj(f_in, f_out)
+        subprocess.run(["gunzip", "-f", T1_niigzcopy], check=True)
 
         # Setup paths for sbref and bold images
         bold_niigz = os.path.join(
@@ -382,7 +381,8 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
             f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz",
         )
         bold_nii = os.path.join(
-            normalization_dir, f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii"
+            normalization_dir, 
+            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii"
         )
         sbref_niigz = os.path.join(
             fmri2standard_path,
@@ -395,21 +395,17 @@ def mni_normalization(subject_id, root_path, bids_path, fmri2standard_path):
             f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
         )
         sbref_nii = os.path.join(
-            normalization_dir, f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii"
+            normalization_dir, 
+            f"{subject_id}_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii"
         )
 
-        # Copy and decompress bold image
+        # Copy and decompress bold images
         shutil.copy(bold_niigz, bold_niigzcopy)
-        with gzip.open(bold_niigzcopy, "rb") as f_in, open(bold_nii, "wb") as f_out:
-            shutil.copyfileobj(f_in, f_out)
+        subprocess.run(["gunzip", "-f", bold_niigzcopy], check=True)
 
-        # Copy and decompress sbref image
+        # Copy and decompress sbref images
         shutil.copy(sbref_niigz, sbref_niigzcopy)
-        with (
-            gzip.open(sbref_niigzcopy, "rb") as f_in,
-            open(sbref_nii, "wb") as f_out,
-        ):  # Write decompressed sbref image as .nii
-            shutil.copyfileobj(f_in, f_out)  # Copy decompressed sbref image
+        subprocess.run(["gunzip", "-f", sbref_niigzcopy], check=True)
 
         # Perform MNI normalization
         MNI = spm.preprocess.Normalize12()
@@ -499,7 +495,10 @@ def apply_nuisance_correction(subject_id, root_path) -> Optional[str]:
             "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27",
         ]
         os.makedirs(output_directory, exist_ok=True)
-        subprocess.run(command_nuisance, check=True)
+        # subprocess.run(command_nuisance, check=True)
+        result = subprocess.run(command_nuisance, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        print(result.stdout)
+        print(result.stderr)
 
     except Exception as e:
         logging.error("Error during nuisance correction for subject %s: %s", subject_id, e)
@@ -757,64 +756,70 @@ def main():
     # # Filter out any None values from the results. None gets returned when an error occurs
     # coregistration_list = [subject for subject in coregistration_list if subject is not None]
 
-    # Step 2.
-    # Setup logging for coregistration
-    change_logger_file("log_02_execute_coregistration")
+    # # Step 2.
+    # # Setup logging for coregistration
+    # change_logger_file("log_02_execute_coregistration")
 
-    # UNCOMMENT when running the full pipeline and remove repetitive code below 
-    # Perform coregistration on the filtered list of subjects
+    # # Perform coregistration on the filtered list of subjects
     # extract_wm_csf_masks_list = []  # Reset results for the next phase
     # for subject in coregistration_list:
     #     results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
     #     if results is not None:
     #         extract_wm_csf_masks_list.append(results)
 
-    extract_wm_csf_masks_list = []  # Reset results for the next phase
-    for subject in subjects_to_process:
-        results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
-        if results is not None:
-            extract_wm_csf_masks_list.append(results)
+    # extract_wm_csf_masks_list = []  # Reset results for the next phase
+    # for subject in subjects_to_process:
+    #     results = execute_coregistration(subject, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
+    #     if results is not None:
+    #         extract_wm_csf_masks_list.append(results)
 
-    # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
-    print(extract_wm_csf_masks_list)
+    # # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
+    # print(extract_wm_csf_masks_list)
 
-    # Step 3a.
-    # Setup logging for WM and CSF mask extraction
-    change_logger_file("log_03a_extract_wm_csf_masks")
+    # # Step 3a.
+    # # Setup logging for WM and CSF mask extraction
+    # change_logger_file("log_03a_extract_wm_csf_masks")
 
-    # Apply nuisance correction initial step using multiprocessing
-    transform_partial_extract_wm_csf_masks = partial(
-        extract_wm_csf_masks,
-        root_path=root_path,
-        fmri2standard_folder=fmri2standard_folder,
-        recon_all_path=recon_all_path,
-    )
-    # Use multiprocessing Pool to apply the function
-    with Pool(os.cpu_count()) as pool:
-        nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
+    # # Apply nuisance correction initial step using multiprocessing
+    # transform_partial_extract_wm_csf_masks = partial(
+    #     extract_wm_csf_masks,
+    #     root_path=root_path,
+    #     fmri2standard_folder=fmri2standard_folder,
+    #     recon_all_path=recon_all_path,
+    # )
+    # # Use multiprocessing Pool to apply the function
+    # with Pool(os.cpu_count()) as pool:
+    #     nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
-    # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
-    nuisance_regression_list = [subject for subject in nuisance_regression_list if subject is not None]
-    print(nuisance_regression_list)
+    # # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
+    # nuisance_regression_list = [subject for subject in nuisance_regression_list if subject is not None]
+    # print(nuisance_regression_list)
 
-    # Step 3b.
-    # Setup logging for nuisance regression
-    change_logger_file("log_03b_run_nuisance_regression")
+    # # Step 3b.
+    # # Setup logging for nuisance regression
+    # change_logger_file("log_03b_run_nuisance_regression")
 
-    # Execute advanced nuisance regression
-    mni_normalization_list = []
-    for subject in nuisance_regression_list:
-        results = run_nuisance_regression(subject, root_path)
-        if results is not None:
-            mni_normalization_list.append(results)
+    # # Execute advanced nuisance regression
+    # mni_normalization_list = []
+    # for subject in nuisance_regression_list:
+    #     results = run_nuisance_regression(subject, root_path)
+    #     if results is not None:
+    #         mni_normalization_list.append(results)
 
     # Step 4.
     # Setup logging for MNI normalization
     change_logger_file("log_04_mni_normalization")
 
     # Perform MNI normalization using multiprocessing
+    #### UNCOMMENT
+    # regression_list = []
+    # for subject in mni_normalization_list:
+    #     results = mni_normalization(subject, root_path, bids_path, fmri2standard_path)
+    #     if results is not None:
+    #         regression_list.append(results)
+
     regression_list = []
-    for subject in mni_normalization_list:
+    for subject in subjects_to_process:
         results = mni_normalization(subject, root_path, bids_path, fmri2standard_path)
         if results is not None:
             regression_list.append(results)
