@@ -170,6 +170,7 @@ def execute_coregistration(subject_id, ses, root_path, fmri2standard_folder, bid
             sbref_dir, f"{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii"
         )
         shutil.copy(sbref_source, sbref_dest)
+        # REMOVE THESE IF WORKING. I AM KEEPING THEM FOR DEBUGGING
         # subprocess.run(["gunzip", "-f", sbref_dest], check=True)
         # sbref_dest_uncompressed = sbref_dest.replace(".nii.gz", ".nii")
 
@@ -221,73 +222,6 @@ def execute_coregistration(subject_id, ses, root_path, fmri2standard_folder, bid
         return
 
     return subject_id
-
-
-# def extract_wm_csf_masks(subject_id, ses, root_path, fmri2standard_folder, recon_all_path):
-#     """Extract white matter (WM) and cerebrospinal fluid (CSF) masks for nuisance correction.
-
-#     This function prepares paths, creates necessary directories, and executes
-#     a mask extraction script. It logs any errors encountered during the process.
-
-#     Args:
-#         subject_id (str): The identifier for the subject being processed.
-#         ses (str): The session or timepoint for the data.
-#         root_path (str): The root path for data storage.
-#         fmri2standard_folder (str): Directory for fMRI to standard transformations.
-#         recon_all_path (str): Directory for FreeSurfer reconall data.
-
-#     Returns:
-#         list: A list of subjects that have completed the mask extraction.
-#     """
-#     print("\n\nNUISANCE CORRECTION\n\n")
-
-#     try:
-#         # Define paths
-#         bold2T1_path = os.path.join(
-#             root_path,
-#             fmri2standard_folder,
-#             subject_id,
-#             "spm_coregister2T1_bold",
-#             f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz",
-#         )
-#         output_masks = os.path.join(root_path, "nuisance_correction", subject_id, "masks_csf_wm")
-#         aseg_folder = os.path.join(recon_all_path, f"{subject_id}_{ses}", "mri", "aseg.mgz")
-
-#         # Create necessary directories
-#         os.makedirs(os.path.join(root_path, "nuisance_correction", subject_id), exist_ok=True)
-#         os.makedirs(output_masks, exist_ok=True)
-
-#         # Execute the mask extraction script with subprocess
-#         try:
-#             subprocess.run(
-#                 [
-#                     "bash",
-#                     "extract_wm_csf_eroded_masks.sh",
-#                     "-s",
-#                     subject_id,
-#                     "-a",
-#                     aseg_folder,
-#                     "-r",
-#                     bold2T1_path,
-#                     "-o",
-#                     output_masks,
-#                     "-b",
-#                     bold2T1_path,
-#                     "-e",
-#                     "2",
-#                 ],
-#                 check=True,
-#             )
-
-#         except subprocess.CalledProcessError as e:
-#             logging.error("Error during WM and CSF mask extraction for subject %s: %s", subject_id, e)
-#             return
-
-#     except Exception as e:
-#         logging.error("Error in extracting WM and CSF masks for subject %s: %s", subject_id, e)
-#         return
-
-#     return subject_id
 
 def extract_wm_csf_masks(subject_id, ses, root_path, fmri2standard_folder, recon_all_path, erode=1):
     """Extract white matter (WM) and cerebrospinal fluid (CSF) masks for nuisance correction.
@@ -538,12 +472,21 @@ def apply_nuisance_correction(subject_id, ses, root_path) -> Optional[str]:
             f"w{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii",
         )
 
+        # IF THIS FAILED THE FIRST TIME AND RUNNING IT AGAIN AND UNCOMMENT THE FOLLOWING LINES
+        # new_name_nii = os.path.join(
+        #     root_path,
+        #     "normalization",
+        #     subject_id,
+        #     # w stands for warped which indicates the image has been normalized
+        #     f"w{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz",
+        # )
+
         nuisance_output = os.path.join(
             root_path,
             "nuisance_correction",
             subject_id,
             "filter_regressors_bold",
-            f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt.nii.gz",
+            f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt.nii",
         )
 
         native_name = os.path.join(
@@ -551,7 +494,7 @@ def apply_nuisance_correction(subject_id, ses, root_path) -> Optional[str]:
             "nuisance_correction",
             subject_id,
             "filter_regressors_bold",
-            f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
+            f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii",
         )
 
         output_directory = os.path.join(root_path, "nuisance_correction", subject_id, "filter_regressors_bold")
@@ -559,6 +502,7 @@ def apply_nuisance_correction(subject_id, ses, root_path) -> Optional[str]:
         # Perform gzip compression and remove the NII file
         subprocess.run(["gzip", "-f", new_name_nii], check=True)
         shutil.move(nuisance_output, native_name)
+        subprocess.run(["gzip", "-f", native_name], check=True)
 
         # Define the path for the compressed file
         mni_pre = f"{new_name_nii}.gz"
@@ -633,7 +577,7 @@ def fmri_quality_control(
                 fmri2standard_path,
                 subject_id,
                 "realign_fmri2SBref",
-                f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.gz.par",
+                f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",
             ),
             "parameter_source": "FSL",
             "out_file": os.path.join(qc_dir, "framewise_displ.txt"),
@@ -660,7 +604,7 @@ def fmri_quality_control(
             f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
         )
         omat = os.path.join(qc_dir, "brain_mask", "omat.mat")
-        out = os.path.join(qc_dir, "brain_mask", "brain_mask_bin_BOLD_T1.nii.gz")
+        out = os.path.join(qc_dir, "brain_mask", "brain_mask_bin_BOLD_T1.nii")
 
         os.makedirs(os.path.dirname(omat), exist_ok=True)
 
@@ -842,74 +786,68 @@ def main():
     #### Run the preprocessing workflow ####
     ########################################
 
-    # # Step 1.
-    # # Setup logging for fMRI to standard transformation
-    # change_logger_file("log_01_transform_fmri_to_standard")
+    # Step 1.
+    # Setup logging for fMRI to standard transformation
+    change_logger_file("log_01_transform_fmri_to_standard")
 
-    # # Define the partial function with fixed arguments
-    # transform_partial_fmri_to_standard = partial(
-    #     transform_fmri_to_standard,
-    #     root_path=root_path,
-    #     ses=ses,
-    #     bids_path=bids_path,
-    #     recon_all_path=recon_all_path,
-    #     acparams_file=acparams_file,
-    # )
+    # Define the partial function with fixed arguments
+    transform_partial_fmri_to_standard = partial(
+        transform_fmri_to_standard,
+        root_path=root_path,
+        ses=ses,
+        bids_path=bids_path,
+        recon_all_path=recon_all_path,
+        acparams_file=acparams_file,
+    )
 
-    # # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    # with Pool(6) as pool:
-    #     coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
+    # Set up a multiprocessing pool to parallelize fMRI standard space transformation
+    with Pool(6) as pool:
+        coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
 
-    # # Filter out any None values from the results. None gets returned when an error occurs
-    # coregistration_list = [subject for subject in coregistration_list if subject is not None]
+    # Filter out any None values from the results. None gets returned when an error occurs
+    coregistration_list = [subject for subject in coregistration_list if subject is not None]
 
-    # # Step 2.
-    # # Setup logging for coregistration
-    # change_logger_file("log_02_execute_coregistration")
+    # Step 2.
+    # Setup logging for coregistration
+    change_logger_file("log_02_execute_coregistration")
 
     # Perform coregistration on the filtered list of subjects
-    # extract_wm_csf_masks_list = []  # Reset results for the next phase
-    # for subject in coregistration_list:
-    #     results = execute_coregistration(subject, ses, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
-    #     if results is not None:
-    #         extract_wm_csf_masks_list.append(results)
+    extract_wm_csf_masks_list = []  # Reset results for the next phase
+    for subject in coregistration_list:
+        results = execute_coregistration(subject, ses, root_path, fmri2standard_folder, bids_path, coreg_EPI2T1)
+        if results is not None:
+            extract_wm_csf_masks_list.append(results)
 
-    # # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
-    # print(extract_wm_csf_masks_list)
+    # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
+    print(extract_wm_csf_masks_list)
 
-    # # Step 3a.
-    # # Setup logging for WM and CSF mask extraction
-    # change_logger_file("log_03a_extract_wm_csf_masks")
+    # Step 3a.
+    # Setup logging for WM and CSF mask extraction
+    change_logger_file("log_03a_extract_wm_csf_masks")
 
-    # # Apply nuisance correction initial step using multiprocessing
-    # transform_partial_extract_wm_csf_masks = partial(
-    #     extract_wm_csf_masks,
-    #     ses=ses,
-    #     root_path=root_path,
-    #     fmri2standard_folder=fmri2standard_folder,
-    #     recon_all_path=recon_all_path,
-    # )
-    # # Use multiprocessing Pool to apply the function
-    # with Pool(os.cpu_count()) as pool:
-    #     nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
+    # Apply nuisance correction initial step using multiprocessing
+    transform_partial_extract_wm_csf_masks = partial(
+        extract_wm_csf_masks,
+        ses=ses,
+        root_path=root_path,
+        fmri2standard_folder=fmri2standard_folder,
+        recon_all_path=recon_all_path,
+    )
+    # Use multiprocessing Pool to apply the function
+    with Pool(os.cpu_count()) as pool:
+        nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
-    # # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
-    # nuisance_regression_list = [subject for subject in nuisance_regression_list if subject is not None]
-    # print(nuisance_regression_list)
+    # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
+    nuisance_regression_list = [subject for subject in nuisance_regression_list if subject is not None]
+    print(nuisance_regression_list)
 
     # Step 3b.
     # Setup logging for nuisance regression
     change_logger_file("log_03b_run_nuisance_regression")
 
     # Execute advanced nuisance regression
-    # mni_normalization_list = []
-    # for subject in nuisance_regression_list:
-    #     results = run_nuisance_regression(subject, ses, root_path)
-    #     if results is not None:
-    #         mni_normalization_list.append(results)
-
     mni_normalization_list = []
-    for subject in subjects_to_process:
+    for subject in nuisance_regression_list:
         results = run_nuisance_regression(subject, ses, root_path)
         if results is not None:
             mni_normalization_list.append(results)

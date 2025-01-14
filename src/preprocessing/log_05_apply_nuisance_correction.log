@@ -1,0 +1,1 @@
+2025-01-14T17:02:48 - ERROR - Error during nuisance correction for subject sub-1091: Command '['gzip', '-f', '/home/rachel/Desktop/Preprocessing/normalization/sub-1091/wsub-1091_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz']' returned non-zero exit status 1.
