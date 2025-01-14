@@ -146,6 +146,8 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
     Returns:
         list: A list of subjects that have completed coregistration.
     """
+    print("\n\nCOREGISTRATION\n\n")
+    
     try:
         # Define paths
         sbref_dir = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_sbref")
@@ -165,12 +167,17 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
         subprocess.run(["gunzip", "-f", sbref_dest], check=True)
         sbref_dest_uncompressed = sbref_dest.replace(".nii.gz", ".nii")
 
-        t1w_source = os.path.join(anat_dir, f"{subject_id}_ses-02_run-01_T1w.nii.gz")
-        # Copy and decompress only once, and ensure it's not deleted prematurely
-        t1w_dest = os.path.join(anat_dir, f"{subject_id}_ses-02_run-01_T1w.nii")
-        if not os.path.exists(t1w_dest):
-            shutil.copy(t1w_source, t1w_dest + ".gz")
-            subprocess.run(["gunzip", "-f", t1w_dest + ".gz"], check=True)
+        t1w_source = os.path.join(anat_dir, 
+                                  f"{subject_id}_ses-02_run-01_T1w.nii.gz")
+        t1w_dest = os.path.join(anat_dir, 
+                                f"{subject_id}_ses-02_run-01_T1w_copy.nii.gz")
+        t1w_new_name = os.path.join(anat_dir, 
+                                f"{subject_id}_ses-02_run-01_T1w_copy.nii")
+        t1w_dest_uncompressed = os.path.join(anat_dir, 
+                        f"{subject_id}_ses-02_run-01_T1w.nii")
+        shutil.copy(t1w_source, t1w_dest)
+        subprocess.run(["gunzip", "-f", t1w_dest], check=True)
+        os.rename(t1w_new_name, t1w_dest_uncompressed)
 
         bold_source = os.path.join(root_path, fmri2standard_folder, subject_id, "apply_topup",
                                    f"{subject_id}_ses-02_task-rest_dir-ap_run-01_bold_roi_mcf_corrected.nii.gz")
@@ -181,7 +188,7 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
         bold_dest_uncompressed = bold_dest.replace(".nii.gz", ".nii")
 
         # SPM coregistration: Align BOLD to standard T1
-        coreg_EPI2T1.inputs.target = t1w_dest
+        coreg_EPI2T1.inputs.target = t1w_dest_uncompressed
         coreg_EPI2T1.inputs.source = sbref_dest_uncompressed
         coreg_EPI2T1.inputs.jobtype = "estimate"
         coreg_EPI2T1.inputs.apply_to_files = [bold_dest_uncompressed]
@@ -191,15 +198,15 @@ def execute_coregistration(subject_id, root_path, fmri2standard_folder, bids_pat
         # Zip back and clean up the original files AFTER all processing is done
         subprocess.run(["gzip", sbref_dest_uncompressed], check=True)
         subprocess.run(["gzip", bold_dest_uncompressed], check=True)
-        if os.path.exists(sbref_dest):
-            os.remove(sbref_dest)
+        # if os.path.exists(sbref_dest):
+        #     os.remove(sbref_dest)
 
-        if os.path.exists(t1w_dest):
-            os.remove(t1w_dest)
+        # if os.path.exists(t1w_dest):
+        #     os.remove(t1w_dest)
 
-        subprocess.run(["gzip", bold_dest], check=True)
-        if os.path.exists(bold_dest):
-            os.remove(bold_dest)
+        # subprocess.run(["gzip", bold_dest], check=True)
+        # if os.path.exists(bold_dest):
+        #     os.remove(bold_dest)
 
     except Exception as e:
         logging.error("Error during SPM coregistration for subject %s: %s", subject_id, e)
@@ -648,7 +655,7 @@ def initialize_preprocessing_dirs(bids_dir, root_path):
 
     for subject_id in os.listdir(bids_dir):
         subject_path = os.path.join(bids_dir, subject_id)
-        print(subject_path, os.path.exists(subject_path))
+        # print(subject_path, os.path.exists(subject_path))
         if os.path.isdir(subject_path):
             subjects_to_process.add(subject_id)
 
