@@ -1,0 +1,115 @@
+2025-01-15T09:51:42 - INFO - Workflow sub-1091 settings: ['check', 'execution', 'logging', 'monitoring']
+2025-01-15T09:51:42 - INFO - Workflow sub-1234 settings: ['check', 'execution', 'logging', 'monitoring']
+2025-01-15T09:51:42 - INFO - Running serially.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1234.Mean_SEgfm_AP" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/Mean_SEgfm_AP".
+2025-01-15T09:51:42 - INFO - [Node] Executing "Mean_SEgfm_AP" <nipype.interfaces.fsl.maths.MeanImage>
+2025-01-15T09:51:42 - INFO - Running serially.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.Mean_SEgfm_AP" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/Mean_SEgfm_AP".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.Mean_SEgfm_AP" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.Mean_SEgfm_AP" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.eliminate_first_scans" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/eliminate_first_scans".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.eliminate_first_scans" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.eliminate_first_scans" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.Merge_ap_pa_inputs" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/Merge_ap_pa_inputs".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.Merge_ap_pa_inputs" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.Merge_ap_pa_inputs" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.mask_T1" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/mask_T1".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.mask_T1" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.mask_T1" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.vol2vol" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/vol2vol".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.vol2vol" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.vol2vol" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.Corregister_SBref2SEgfm" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/Corregister_SBref2SEgfm".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.Corregister_SBref2SEgfm" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.Corregister_SBref2SEgfm" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.Merge_SEgfm_AP_PA" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/Merge_SEgfm_AP_PA".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.Merge_SEgfm_AP_PA" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.Merge_SEgfm_AP_PA" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.binarize_mask" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/binarize_mask".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.binarize_mask" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.binarize_mask" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.realign_fmri2SBref" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/realign_fmri2SBref".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.realign_fmri2SBref" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.realign_fmri2SBref" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.Topup_SEgfm_estimation" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/Topup_SEgfm_estimation".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.Topup_SEgfm_estimation" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.Topup_SEgfm_estimation" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.extract_mask" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/extract_mask".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.extract_mask" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.extract_mask" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.apply_topup" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/apply_topup".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.apply_topup" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.apply_topup" found cached.
+2025-01-15T09:51:42 - INFO - [Node] Setting-up "sub-1091.apply_topup_to_SBref" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/apply_topup_to_SBref".
+2025-01-15T09:51:42 - INFO - [Node] Cached "sub-1091.apply_topup_to_SBref" - collecting precomputed outputs
+2025-01-15T09:51:42 - INFO - [Node] "sub-1091.apply_topup_to_SBref" found cached.
+2025-01-15T09:51:43 - INFO - [Node] Finished "Mean_SEgfm_AP", elapsed time 0.646066s.
+2025-01-15T09:51:43 - INFO - [Node] Setting-up "sub-1234.eliminate_first_scans" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/eliminate_first_scans".
+2025-01-15T09:51:43 - INFO - [Node] Executing "eliminate_first_scans" <nipype.interfaces.fsl.utils.ExtractROI>
+2025-01-15T09:51:58 - INFO - [Node] Finished "eliminate_first_scans", elapsed time 14.600957s.
+2025-01-15T09:51:58 - INFO - [Node] Setting-up "sub-1234.Merge_ap_pa_inputs" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/Merge_ap_pa_inputs".
+2025-01-15T09:51:58 - INFO - [Node] Executing "Merge_ap_pa_inputs" <nipype.interfaces.utility.base.Merge>
+2025-01-15T09:51:58 - INFO - [Node] Finished "Merge_ap_pa_inputs", elapsed time 0.000234s.
+2025-01-15T09:51:58 - INFO - [Node] Setting-up "sub-1234.mask_T1" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/mask_T1".
+2025-01-15T09:51:58 - INFO - [Node] Executing "mask_T1" <nipype.interfaces.fsl.preprocess.BET>
+2025-01-15T09:52:06 - INFO - [Node] Finished "mask_T1", elapsed time 7.984609s.
+2025-01-15T09:52:06 - INFO - [Node] Setting-up "sub-1234.vol2vol" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/vol2vol".
+2025-01-15T09:52:06 - INFO - [Node] Executing "vol2vol" <nipype.interfaces.freesurfer.preprocess.ApplyVolTransform>
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:movvol /home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/vol2vol/brain.mgz
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:targvol /home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS/sub-1234/ses-02/anat/sub-1234_ses-02_run-01_T1w.nii.gz
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:outvol brainmask_warped.nii.gz
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:invert 0
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:tal    0
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:talres 2
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:regheader 1
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:noresample 0
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:interp  trilinear (1)
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:precision  float (3)
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:Gdiag_no  -1
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:Synth      0
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:SynthSeed  1737078900
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:Computing registration based on scanner-to-scanner
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:Final tkRAS-to-tkRAS Matrix is:
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:-0.99947   0.03195  -0.00606   0.00002;
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508: 0.01124   0.16453  -0.98631   0.00002;
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508: 0.03052   0.98585   0.16480   0.00001;
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508: 0.00000   0.00000   0.00000   1.00000;
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:Vox2Vox Matrix is:
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:-0.79958  -0.00485  -0.02556   215.97313;
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508: 0.02441   0.13184  -0.78868   231.87456;
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508:-0.00899   0.78905   0.13162  -10.48116;
+2025-01-15T09:52:06 - INFO - stdout 2025-01-15T09:52:06.533508: 0.00000   0.00000   0.00000   1.00000;
+2025-01-15T09:52:09 - INFO - stdout 2025-01-15T09:52:09.233194:
+2025-01-15T09:52:09 - INFO - stdout 2025-01-15T09:52:09.233194:Resampling
+2025-01-15T09:52:09 - INFO - stdout 2025-01-15T09:52:09.233194:Output registration matrix is identity
+2025-01-15T09:52:09 - INFO - stdout 2025-01-15T09:52:09.233194:
+2025-01-15T09:52:09 - INFO - stdout 2025-01-15T09:52:09.233194:mri_vol2vol done
+2025-01-15T09:52:09 - INFO - [Node] Finished "vol2vol", elapsed time 3.235368s.
+2025-01-15T09:52:09 - INFO - [Node] Setting-up "sub-1234.Corregister_SBref2SEgfm" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/Corregister_SBref2SEgfm".
+2025-01-15T09:52:09 - INFO - [Node] Executing "Corregister_SBref2SEgfm" <nipype.interfaces.fsl.preprocess.FLIRT>
+2025-01-15T09:52:14 - INFO - [Node] Finished "Corregister_SBref2SEgfm", elapsed time 5.523758s.
+2025-01-15T09:52:14 - INFO - [Node] Setting-up "sub-1234.Merge_SEgfm_AP_PA" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/Merge_SEgfm_AP_PA".
+2025-01-15T09:52:14 - INFO - [Node] Executing "Merge_SEgfm_AP_PA" <nipype.interfaces.fsl.utils.Merge>
+2025-01-15T09:52:15 - INFO - [Node] Finished "Merge_SEgfm_AP_PA", elapsed time 0.322077s.
+2025-01-15T09:52:15 - INFO - [Node] Setting-up "sub-1234.binarize_mask" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/binarize_mask".
+2025-01-15T09:52:15 - INFO - [Node] Executing "binarize_mask" <nipype.interfaces.fsl.maths.UnaryMaths>
+2025-01-15T09:52:16 - INFO - [Node] Finished "binarize_mask", elapsed time 1.017524s.
+2025-01-15T09:52:16 - INFO - [Node] Setting-up "sub-1234.realign_fmri2SBref" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/realign_fmri2SBref".
+2025-01-15T09:52:16 - INFO - [Node] Executing "realign_fmri2SBref" <nipype.interfaces.fsl.preprocess.MCFLIRT>
+2025-01-15T09:55:11 - INFO - [Node] Finished "realign_fmri2SBref", elapsed time 175.043946s.
+2025-01-15T09:55:11 - INFO - [Node] Setting-up "sub-1234.Topup_SEgfm_estimation" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/Topup_SEgfm_estimation".
+2025-01-15T09:55:11 - INFO - [Node] Executing "Topup_SEgfm_estimation" <nipype.interfaces.fsl.epi.TOPUP>
+2025-01-15T10:23:41 - INFO - [Node] Finished "Topup_SEgfm_estimation", elapsed time 1709.761743s.
+2025-01-15T10:23:41 - INFO - [Node] Setting-up "sub-1234.extract_mask" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/extract_mask".
+2025-01-15T10:23:41 - INFO - [Node] Executing "extract_mask" <nipype.interfaces.fsl.maths.BinaryMaths>
+2025-01-15T10:23:42 - INFO - [Node] Finished "extract_mask", elapsed time 1.540994s.
+2025-01-15T10:23:42 - INFO - [Node] Setting-up "sub-1234.apply_topup" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/apply_topup".
+2025-01-15T10:23:42 - INFO - [Node] Executing "apply_topup" <nipype.interfaces.fsl.epi.ApplyTOPUP>
+2025-01-15T10:26:31 - INFO - [Node] Finished "apply_topup", elapsed time 169.321468s.
+2025-01-15T10:26:31 - INFO - [Node] Setting-up "sub-1234.apply_topup_to_SBref" in "/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1234/apply_topup_to_SBref".
+2025-01-15T10:26:32 - INFO - [Node] Executing "apply_topup_to_SBref" <nipype.interfaces.fsl.epi.ApplyTOPUP>
+2025-01-15T10:26:33 - INFO - [Node] Finished "apply_topup_to_SBref", elapsed time 1.325196s.

@@ -657,6 +657,83 @@ def fmri_quality_control(
 
     return subject_id
 
+########## GZ THE FILES SO THEY MATCH THE SAME FORMAT AS TP1
+def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
+    """
+    Prepare necessary directories and copy MRI data for a given subject.
+
+    Args:
+        subject_id (str): The identifier for the subject whose data is being prepared.
+        ses (str): The session or timepoint for the data.
+        root_path (str): The root path for data storage.
+        output_path (str): The path to the output directory.
+    """
+    # Directory paths for the outputs
+    dirs = {
+        "native_t1": os.path.join(output_path, subject_id, ses, "native_T1"),
+        "mni_2mm": os.path.join(output_path, subject_id, ses, "MNI_2mm"),
+    }
+
+    # Create directories if they don't exist
+    for dir_path in dirs.values():
+        os.makedirs(dir_path, exist_ok=True)
+
+    # First zip the files so they match output format
+    subprocess.run(["gzip", "-f",
+                    f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii"], 
+                    check=True)
+    subprocess.run(["gzip", "-f",
+                    f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii"],
+                    check=True)
+
+    # Define source and destination paths using a dictionary
+    paths = {
+        "bold_native": (
+            f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
+            f"{dirs['native_t1']}/{subject_id}_ses-{ses}_run-01_rest_bold_ap_T1-space.nii.gz"
+        ),
+        "sbref_native": (
+            f"{root_path}/fmri2standard/{subject_id}/spm_coregister2T1_sbref/{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
+            f"{dirs['native_t1']}/{subject_id}_ses-{ses}_run-01_rest_sbref_ap_T1-space.nii.gz"
+        ),
+        "framew": (
+            f"{root_path}/QC/{subject_id}/framewise_displ.txt",
+            f"{dirs['native_t1']}/framewise_displ.txt"
+        ),
+        "motion_native": (
+            f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",
+            f"{dirs['native_t1']}/motion.txt"
+        ),
+        "nuisance": (
+            f"{root_path}/nuisance_correction/{subject_id}/merge_nuisance_txt/all_nuisances.txt",
+            f"{dirs['native_t1']}/nuisance_regressors.txt"
+        ),
+        "bold_mni": (
+            f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz",
+            f"{dirs['mni_2mm']}/{subject_id}_ses-{ses}_run-01_rest_bold_ap_MNI-space.nii.gz"
+        ),
+        "sbref_mni": (
+            f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
+            f"{dirs['mni_2mm']}/{subject_id}_ses-{ses}_run-01_rest_sbref_ap_MNI-space.nii.gz"
+        ),
+        "motion_mni": (
+            f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",
+            f"{dirs['mni_2mm']}/motion.txt"
+        ),
+        "nuisance": (
+            f"{root_path}/nuisance_correction/{subject_id}/merge_nuisance_txt/all_nuisances.txt",
+            f"{dirs['mni_2mm']}/nuisance_regressors.txt"
+        ),
+    }
+
+    # Copy files using the paths dictionary
+    for name, (src, dst) in paths.items():
+        try:
+            shutil.copy(src, dst)
+            print(f"Copied {src} to {dst}")
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+
 
 def initialize_preprocessing_dirs(bids_dir, ses, root_path):
     """Initialize directories and determine subjects needing processing.
@@ -673,13 +750,12 @@ def initialize_preprocessing_dirs(bids_dir, ses, root_path):
     def is_processed(subject_id, root_path) -> bool:
         """Check if a subject has all the required files for processing."""
         paths = {
-            "motion": f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.gz.par",
+            "motion": f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",
             "sbref_native": f"{root_path}/fmri2standard/{subject_id}/spm_coregister2T1_sbref/{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
             "bold_native": f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
-            "bold_MNI": f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz",
+            "bold_mni": f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii",
             "nuisance": f"{root_path}/nuisance_correction/{subject_id}/merge_nuisance_txt/all_nuisances.txt",
-            "sbref_MNI_1": f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii",
-            "sbref_MNI_2": f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
+            "sbref_mni": f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii",
             "framew": f"{root_path}/QC/{subject_id}/framewise_displ.txt",
         }
 
@@ -754,6 +830,7 @@ def main():
     nuisance_correction_path = os.path.join(root_path, "nuisance_correction")
     ses = "ses-02"  # Session or timepoint for the data
     # bids_dir = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
+    output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed"
 
     # Set up FSL so it runs correctly in this script
     # Change file paths as needed
