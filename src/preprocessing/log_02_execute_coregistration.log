@@ -1,1 +1,0 @@
-2025-01-14T16:31:30 - ERROR - Error during SPM coregistration for subject sub-1091: [Errno 2] No such file or directory: '/home/rachel/Desktop/Preprocessing/fmri2standard/sub-1091/apply_topup_to_SBref/sub-1091_ses-02_task-rest_dir-ap_run-01_sbref_flirt_corrected.nii'

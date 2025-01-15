@@ -655,10 +655,6 @@ def fmri_quality_control(
         logging.error("Error in DVARS computation for subject %s: %s", subject_id, e)
         return
 
-    # Cleanup directories to free space
-    shutil.rmtree(os.path.join(root_path, bids_path, subject_id), ignore_errors=True)
-    shutil.rmtree(os.path.join(recon_all_path, subject_id), ignore_errors=True)
-
     return subject_id
 
 
