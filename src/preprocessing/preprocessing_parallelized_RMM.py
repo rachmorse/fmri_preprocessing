@@ -730,9 +730,10 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
     for name, (src, dst) in paths.items():
         try:
             shutil.copy(src, dst)
-            print(f"Copied {src} to {dst}")
-        except FileNotFoundError as e:
-            print(f"Error: {e}")
+        except Exception as e:
+            logging.error("Error in copying the preprocessed files for subject %s: %s", subject_id, e)
+        
+        return subject_id
 
 
 def initialize_preprocessing_dirs(bids_dir, ses, root_path):
@@ -929,7 +930,7 @@ def main():
     # Setup logging for MNI normalization
     change_logger_file("log_04_mni_normalization")
 
-    # # Perform MNI normalization using multiprocessing
+    # Perform MNI normalization using multiprocessing
     regression_list = []
     for subject in mni_normalization_list:
         results = mni_normalization(subject, ses, root_path, bids_path, fmri2standard_path)

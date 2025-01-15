@@ -1,0 +1,11 @@
+2025-01-15T11:18:36 - INFO - Workflow sub-1234 settings: ['check', 'execution', 'logging', 'monitoring']
+2025-01-15T11:18:36 - INFO - Running serially.
+2025-01-15T11:18:36 - INFO - [Node] Setting-up "sub-1234.dvars_node" in "/home/rachel/Desktop/Preprocessing/QC/sub-1234/dvars_node".
+2025-01-15T11:18:36 - INFO - [Node] Executing "dvars_node" <nipype.algorithms.confounds.ComputeDVARS>
+2025-01-15T11:18:38 - INFO - Workflow sub-1091 settings: ['check', 'execution', 'logging', 'monitoring']
+2025-01-15T11:18:38 - INFO - Running serially.
+2025-01-15T11:18:38 - INFO - [Node] Setting-up "sub-1091.dvars_node" in "/home/rachel/Desktop/Preprocessing/QC/sub-1091/dvars_node".
+2025-01-15T11:18:38 - INFO - [Node] Outdated cache found for "sub-1091.dvars_node".
+2025-01-15T11:18:38 - INFO - [Node] Executing "dvars_node" <nipype.algorithms.confounds.ComputeDVARS>
+2025-01-15T11:19:33 - INFO - [Node] Finished "dvars_node", elapsed time 55.321723s.
+2025-01-15T11:20:38 - INFO - [Node] Finished "dvars_node", elapsed time 121.366598s.
