@@ -828,7 +828,7 @@ def initialize_preprocessing_dirs(bids_dir, ses, root_path, output_path):
 
     # Filter to find subjects that still need processing
     subjects_needing_processing = {
-        subject_id for subject_id in subjects_to_process if not is_processed(subject_id, root_path)
+        subject_id for subject_id in subjects_to_process if not is_processed(subject_id, ses, output_path)
     }
 
     return subjects_needing_processing
@@ -907,7 +907,7 @@ def main():
     coreg_EPI2T1 = spm.Coregister()
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
-    subjects_to_process = initialize_preprocessing_dirs(bids_dir, ses, root_path)
+    subjects_to_process = initialize_preprocessing_dirs(bids_dir, ses, root_path, output_path)
 
     print(f"Subjects to process: {subjects_to_process}")
 
