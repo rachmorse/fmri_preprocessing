@@ -223,6 +223,7 @@ def execute_coregistration(subject_id, ses, root_path, fmri2standard_folder, bid
 
     return subject_id
 
+
 def extract_wm_csf_masks(subject_id, ses, root_path, fmri2standard_folder, recon_all_path, erode=1):
     """Extract white matter (WM) and cerebrospinal fluid (CSF) masks for nuisance correction.
 
@@ -245,7 +246,9 @@ def extract_wm_csf_masks(subject_id, ses, root_path, fmri2standard_folder, recon
     try:
         # Define paths
         bold_filename = f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz"
-        bold2T1_path = os.path.join(root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_bold", bold_filename)
+        bold2T1_path = os.path.join(
+            root_path, fmri2standard_folder, subject_id, "spm_coregister2T1_bold", bold_filename
+        )
         output_masks = os.path.join(root_path, "nuisance_correction", subject_id, "masks_csf_wm")
         aseg_folder = os.path.join(recon_all_path, f"{subject_id}_{ses}", "mri", "aseg.mgz")
 
@@ -262,9 +265,16 @@ def extract_wm_csf_masks(subject_id, ses, root_path, fmri2standard_folder, recon
             wm_bold_extracted_nii_gz = os.path.join(output_masks, "wm_bold_extracted.nii.gz")
 
             # Execute commands for WM
-            subprocess.run(["mri_binarize", "--i", aseg_folder, "--match", "2", "41", "--o", wm_mgz, "--erode", str(erode)], check=True)
-            subprocess.run(["mri_vol2vol", "--mov", wm_mgz, "--regheader", "--targ", bold2T1_path, "--o", wm_sbref_mgz], check=True)
-            subprocess.run(["mri_convert", "--in_type", "mgz", "--out_type", "nii", wm_sbref_mgz, wm_nii_gz], check=True)
+            subprocess.run(
+                ["mri_binarize", "--i", aseg_folder, "--match", "2", "41", "--o", wm_mgz, "--erode", str(erode)],
+                check=True,
+            )
+            subprocess.run(
+                ["mri_vol2vol", "--mov", wm_mgz, "--regheader", "--targ", bold2T1_path, "--o", wm_sbref_mgz], check=True
+            )
+            subprocess.run(
+                ["mri_convert", "--in_type", "mgz", "--out_type", "nii", wm_sbref_mgz, wm_nii_gz], check=True
+            )
             subprocess.run(["fslmaths", wm_nii_gz, "-bin", wm_binmask_nii_gz], check=True)
             subprocess.run(["fslmaths", bold2T1_path, "-mul", wm_binmask_nii_gz, wm_bold_extracted_nii_gz], check=True)
 
@@ -276,11 +286,37 @@ def extract_wm_csf_masks(subject_id, ses, root_path, fmri2standard_folder, recon
             csf_bold_extracted_nii_gz = os.path.join(output_masks, "csf_bold_extracted.nii.gz")
 
             # Execute commands for CSF
-            subprocess.run(["mri_binarize", "--i", aseg_folder, "--match", "4", "5", "14", "15", "24", "43", "44", "--o", csf_mgz, "--erode", str(erode)], check=True)
-            subprocess.run(["mri_vol2vol", "--mov", csf_mgz, "--regheader", "--targ", bold2T1_path, "--o", csf_sbref_mgz], check=True)
-            subprocess.run(["mri_convert", "--in_type", "mgz", "--out_type", "nii", csf_sbref_mgz, csf_nii_gz], check=True)
+            subprocess.run(
+                [
+                    "mri_binarize",
+                    "--i",
+                    aseg_folder,
+                    "--match",
+                    "4",
+                    "5",
+                    "14",
+                    "15",
+                    "24",
+                    "43",
+                    "44",
+                    "--o",
+                    csf_mgz,
+                    "--erode",
+                    str(erode),
+                ],
+                check=True,
+            )
+            subprocess.run(
+                ["mri_vol2vol", "--mov", csf_mgz, "--regheader", "--targ", bold2T1_path, "--o", csf_sbref_mgz],
+                check=True,
+            )
+            subprocess.run(
+                ["mri_convert", "--in_type", "mgz", "--out_type", "nii", csf_sbref_mgz, csf_nii_gz], check=True
+            )
             subprocess.run(["fslmaths", csf_nii_gz, "-bin", csf_binmask_nii_gz], check=True)
-            subprocess.run(["fslmaths", bold2T1_path, "-mul", csf_binmask_nii_gz, csf_bold_extracted_nii_gz], check=True)
+            subprocess.run(
+                ["fslmaths", bold2T1_path, "-mul", csf_binmask_nii_gz, csf_bold_extracted_nii_gz], check=True
+            )
 
         except subprocess.CalledProcessError as e:
             logging.error("Error during WM and CSF mask extraction for subject %s: %s", subject_id, e)
@@ -657,13 +693,12 @@ def fmri_quality_control(
 
     return subject_id
 
-########## GZ THE FILES SO THEY MATCH THE SAME FORMAT AS TP1
+
 def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
-    """
-    Prepare necessary directories and copy MRI data for a given subject.
+    """Prepare necessary directories and copy preprocessed data for a given subject.
 
     Args:
-        subject_id (str): The identifier for the subject whose data is being prepared.
+        subject_id (str): The identifier for the subject.
         ses (str): The session or timepoint for the data.
         root_path (str): The root path for data storage.
         output_path (str): The path to the output directory.
@@ -679,85 +714,105 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
         os.makedirs(dir_path, exist_ok=True)
 
     # First zip the files so they match output format
-    subprocess.run(["gzip", "-f",
-                    f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii"], 
-                    check=True)
-    subprocess.run(["gzip", "-f",
-                    f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii"],
-                    check=True)
+    subprocess.run(
+        [
+            "gzip",
+            "-f",
+            f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "gzip",
+            "-f",
+            f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii",
+        ],
+        check=True,
+    )
 
     # Define source and destination paths using a dictionary
     paths = {
         "bold_native": (
             f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
-            f"{dirs['native_t1']}/{subject_id}_ses-{ses}_run-01_rest_bold_ap_T1-space.nii.gz"
+            f"{dirs['native_t1']}/{subject_id}_{ses}_run-01_rest_bold_ap_T1-space.nii.gz",
         ),
         "sbref_native": (
             f"{root_path}/fmri2standard/{subject_id}/spm_coregister2T1_sbref/{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
-            f"{dirs['native_t1']}/{subject_id}_ses-{ses}_run-01_rest_sbref_ap_T1-space.nii.gz"
+            f"{dirs['native_t1']}/{subject_id}_{ses}_run-01_rest_sbref_ap_T1-space.nii.gz",
         ),
-        "framew": (
+        "framew_native": (
             f"{root_path}/QC/{subject_id}/framewise_displ.txt",
             f"{dirs['native_t1']}/framewise_displ.txt"
         ),
         "motion_native": (
-            f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",
-            f"{dirs['native_t1']}/motion.txt"
+            f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par", #### CONVERT CHECK
+            f"{dirs['native_t1']}/motion.txt",
         ),
-        "nuisance": (
+        "nuisance_native": (
             f"{root_path}/nuisance_correction/{subject_id}/merge_nuisance_txt/all_nuisances.txt",
-            f"{dirs['native_t1']}/nuisance_regressors.txt"
+            f"{dirs['native_t1']}/nuisance_regressors.txt",
         ),
         "bold_mni": (
             f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz",
-            f"{dirs['mni_2mm']}/{subject_id}_ses-{ses}_run-01_rest_bold_ap_MNI-space.nii.gz"
+            f"{dirs['mni_2mm']}/{subject_id}_{ses}_run-01_rest_bold_ap_MNI-space.nii.gz",
         ),
         "sbref_mni": (
             f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
-            f"{dirs['mni_2mm']}/{subject_id}_ses-{ses}_run-01_rest_sbref_ap_MNI-space.nii.gz"
+            f"{dirs['mni_2mm']}/{subject_id}_{ses}_run-01_rest_sbref_ap_MNI-space.nii.gz",
+        ),
+        "framew_native": (
+            f"{root_path}/QC/{subject_id}/framewise_displ.txt",
+            f"{dirs['native_t1']}/framewise_displ.txt"
         ),
         "motion_mni": (
             f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",
-            f"{dirs['mni_2mm']}/motion.txt"
+            f"{dirs['mni_2mm']}/motion.txt",
         ),
-        "nuisance": (
+        "nuisance_mni": (
             f"{root_path}/nuisance_correction/{subject_id}/merge_nuisance_txt/all_nuisances.txt",
-            f"{dirs['mni_2mm']}/nuisance_regressors.txt"
+            f"{dirs['mni_2mm']}/nuisance_regressors.txt",
         ),
     }
 
     # Copy files using the paths dictionary
-    for name, (src, dst) in paths.items():
+    for _name, (src, dst) in paths.items():
         try:
             shutil.copy(src, dst)
         except Exception as e:
             logging.error("Error in copying the preprocessed files for subject %s: %s", subject_id, e)
-        
-        return subject_id
+
+    return subject_id
 
 
-def initialize_preprocessing_dirs(bids_dir, ses, root_path):
+def initialize_preprocessing_dirs(bids_dir, ses, root_path, output_path):
     """Initialize directories and determine subjects needing processing.
 
     Args:
         bids_dir (str): Directory containing the BIDS datasets.
         ses (str): The session or timepoint for the data.
         root_path (str): Root path of preprocessed data.
+        output_path (str): Path to the output directory.
 
     Returns:
         set: A set containing identifiers of subjects yet to be processed.
     """
 
-    def is_processed(subject_id, root_path) -> bool:
-        """Check if a subject has all the required files for processing."""
+    def is_processed(subject_id, ses, output_path) -> bool:
+        """Check if a subject has all the required files in the output directory."""
+        dirs = {
+            "native_t1": os.path.join(output_path, subject_id, ses, "native_T1"),
+            "mni_2mm": os.path.join(output_path, subject_id, ses, "MNI_2mm"),
+        }
+
         paths = {
-            "motion": f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",
-            "sbref_native": f"{root_path}/fmri2standard/{subject_id}/spm_coregister2T1_sbref/{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
-            "bold_native": f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_NATIVE.nii.gz",
-            "bold_mni": f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii",
-            "nuisance": f"{root_path}/nuisance_correction/{subject_id}/merge_nuisance_txt/all_nuisances.txt",
-            "sbref_mni": f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii",
-            "framew": f"{root_path}/QC/{subject_id}/framewise_displ.txt",
+            "bold_native": os.path.join(dirs["native_t1"], f"{subject_id}_{ses}_run-01_rest_bold_ap_T1-space.nii.gz"),
+            "sbref_native": os.path.join(dirs["native_t1"], f"{subject_id}_{ses}_run-01_rest_sbref_ap_T1-space.nii.gz"),
+            "framew_native": os.path.join(dirs["native_t1"], "framewise_displ.txt"), # Only one framewise displacement, motion and nuissance because the T1 and MNI ones are the same
+            "motion_native": os.path.join(dirs["native_t1"], "motion.txt"),
+            "nuisance_native": os.path.join(dirs["native_t1"], "nuisance_regressors.txt"),
+            "bold_mni": os.path.join(dirs["mni_2mm"], f"{subject_id}_{ses}_run-01_rest_bold_ap_MNI-space.nii.gz"),
+            "sbref_mni": os.path.join(dirs["mni_2mm"], f"{subject_id}_{ses}_run-01_rest_sbref_ap_MNI-space.nii.gz"),
         }
 
         # Check for existence of files
@@ -786,7 +841,7 @@ def change_logger_file(file_name: str):
     named after the specific step being processed.
 
     Args:
-        step_name (str): The name of the processing step to log.
+        file_name (str): The name of the file to write logs to.
     """
     root_logger = logging.getLogger()
 
@@ -835,9 +890,9 @@ def main():
 
     # Set up FSL so it runs correctly in this script
     # Change file paths as needed
-    os.environ['FSLDIR'] = '/home/rachel/fsl' 
-    os.environ['PATH'] = f"{os.environ['FSLDIR']}/bin:" + os.environ['PATH']
-    subprocess.run(['bash', '-c', 'source /home/rachel/fsl/etc/fslconf/fsl.sh'], check=True)
+    os.environ["FSLDIR"] = "/home/rachel/fsl"
+    os.environ["PATH"] = f"{os.environ['FSLDIR']}/bin:" + os.environ["PATH"]
+    subprocess.run(["bash", "-c", "source /home/rachel/fsl/etc/fslconf/fsl.sh"], check=True)
 
     # Set FSL to output uncompressed NIFTI files
     os.environ["FSLOUTPUTTYPE"] = "NIFTI"
@@ -965,7 +1020,21 @@ def main():
     )
 
     with Pool(8) as pool:
-        final_results = pool.map(transform_partial_fmri_quality_control, qc_list)
+        copy_subjects = pool.map(transform_partial_fmri_quality_control, qc_list)
+
+    copy_subjects = [subject for subject in copy_subjects if subject is not None]
+
+    # Step 7.
+    # Setup logging for preparing and copying preprocessed data
+    change_logger_file("log_07_prepare_and_copy_preprocessed_data")
+
+    # Prepare and copy preprocessed data using multiprocessing
+    transform_partial_prepare_and_copy = partial(
+        prepare_and_copy_preprocessed_data, ses=ses, root_path=root_path, output_path=output_path
+    )
+
+    with Pool(8) as pool:
+        final_results = pool.map(transform_partial_prepare_and_copy, copy_subjects)
 
     final_results = [subject for subject in final_results if subject is not None]
 
