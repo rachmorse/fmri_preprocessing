@@ -24,39 +24,6 @@ from nipype.interfaces import spm, utility
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.ERROR)
 
-# def prepare_data(subject_id, recon_all_path, source_dir):
-#     """
-#     Prepare necessary directories and copy MRI data for a given subject.
-
-#     Args:
-#         subject_id (str): The identifier for the subject whose data is being prepared.
-#         recon_all_path (str): The directory path for freesurfer-reconall data storage.
-#         bids_dir (str): The directory path for the source data.
-#     """
-#     try:
-#         # Construct paths
-#         subject_reconall = os.path.join(recon_all_path, f"{subject_id}_ses-02")
-#         mri_dir = os.path.join(subject_reconall, "mri")
-#         aseg_file = os.path.join(mri_dir, "aseg.mgz")
-
-#         # Check if the aseg.mgz file is already present
-#         if not os.path.isfile(aseg_file):
-#             print("Copying aseg.mgz and brain.mgz from institut freesurfer-reconall folder...")
-
-#             # Create required directories
-#             os.makedirs(mri_dir, exist_ok=True)
-
-#             # Define source directory where files are copied from
-#             reconall_dir_mri = os.path.join(recon_all_path, f"{subject_id}_ses-02", "mri")
-
-#             # Copy files to the destination directory
-#             shutil.copy(os.path.join(reconall_dir_mri, "aseg.mgz"), mri_dir)
-#             shutil.copy(os.path.join(reconall_dir_mri, "brain.mgz"), mri_dir)
-#         else:
-#             print("aseg.mgz and brain.mgz already copied")
-#     except Exception as e:
-#         logging.error("Error copying aseg.mgz & brain.mgz for subject %s: %s", subject_id, e)
-
 
 def transform_fmri_to_standard(
     subject_id, ses, root_path, bids_path, recon_all_path, acparams_file, write_graph=False
@@ -85,7 +52,7 @@ def transform_fmri_to_standard(
 
     # prepare_data(subject_id)
 
-    print("\n\nFMRI TO STANDARD\n\n")
+    print("\n\n01. FMRI TO STANDARD\n\n")
 
     try:
         # Define the workflow to get the acparams file
@@ -146,7 +113,7 @@ def execute_coregistration(subject_id, ses, root_path, fmri2standard_folder, bid
     Returns:
         list: A list of subjects that have completed coregistration.
     """
-    print("\n\nCOREGISTRATION\n\n")
+    print("\n\n02. COREGISTRATION\n\n")
 
     try:
         # Define paths
@@ -170,9 +137,6 @@ def execute_coregistration(subject_id, ses, root_path, fmri2standard_folder, bid
             sbref_dir, f"{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii"
         )
         shutil.copy(sbref_source, sbref_dest)
-        # REMOVE THESE IF WORKING. I AM KEEPING THEM FOR DEBUGGING
-        # subprocess.run(["gunzip", "-f", sbref_dest], check=True)
-        # sbref_dest_uncompressed = sbref_dest.replace(".nii.gz", ".nii")
 
         t1w_source = os.path.join(anat_dir, f"{subject_id}_{ses}_run-01_T1w.nii.gz")
         t1w_dest = os.path.join(anat_dir, f"{subject_id}_{ses}_run-01_T1w_copy.nii.gz")
@@ -193,8 +157,6 @@ def execute_coregistration(subject_id, ses, root_path, fmri2standard_folder, bid
             bold_dir, f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii"
         )
         shutil.copy(bold_source, bold_dest)
-        # subprocess.run(["gunzip", "-f", bold_dest], check=True)
-        # bold_dest_uncompressed = bold_dest.replace(".nii.gz", ".nii")
 
         # SPM coregistration: Align BOLD to standard T1
         coreg_EPI2T1.inputs.target = t1w_dest_uncompressed
@@ -207,15 +169,6 @@ def execute_coregistration(subject_id, ses, root_path, fmri2standard_folder, bid
         # Zip back and clean up the original files AFTER all processing is done
         subprocess.run(["gzip", sbref_dest], check=True)
         subprocess.run(["gzip", bold_dest], check=True)
-        # if os.path.exists(sbref_dest):
-        #     os.remove(sbref_dest)
-
-        # if os.path.exists(t1w_dest):
-        #     os.remove(t1w_dest)
-
-        # subprocess.run(["gzip", bold_dest], check=True)
-        # if os.path.exists(bold_dest):
-        #     os.remove(bold_dest)
 
     except Exception as e:
         logging.error("Error during SPM coregistration for subject %s: %s", subject_id, e)
@@ -241,7 +194,7 @@ def extract_wm_csf_masks(subject_id, ses, root_path, fmri2standard_folder, recon
     Returns:
         list: A list of subjects that have completed the mask extraction.
     """
-    print("\n\nNUISANCE CORRECTION\n\n")
+    print("\n\n03. NUISANCE CORRECTION\n\n")
 
     try:
         # Define paths
@@ -403,7 +356,7 @@ def mni_normalization(subject_id, ses, root_path, bids_path, fmri2standard_path)
     Returns:
         list: A list of subjects that have completed MNI normalization.
     """
-    print("\n\nMNI NORMALIZATION\n\n")
+    print("\n\n04. MNI NORMALIZATION\n\n")
     try:
         # Create necessary directory for normalization
         normalization_dir = os.path.join(root_path, "normalization", subject_id)
@@ -497,7 +450,7 @@ def apply_nuisance_correction(subject_id, ses, root_path) -> Optional[str]:
     Returns:
         list: A list of subjects that have completed nuisance correction.
     """
-    print("\n\nAPPLYING NUISANCE CORRECTION\n\n")
+    print("\n\n05. APPLYING NUISANCE CORRECTION\n\n")
     try:
         # Define paths
         new_name_nii = os.path.join(
@@ -507,15 +460,6 @@ def apply_nuisance_correction(subject_id, ses, root_path) -> Optional[str]:
             # w stands for warped which indicates the image has been normalized
             f"w{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii",
         )
-
-        # IF THIS FAILED THE FIRST TIME AND RUNNING IT AGAIN AND UNCOMMENT THE FOLLOWING LINES
-        # new_name_nii = os.path.join(
-        #     root_path,
-        #     "normalization",
-        #     subject_id,
-        #     # w stands for warped which indicates the image has been normalized
-        #     f"w{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz",
-        # )
 
         nuisance_output = os.path.join(
             root_path,
@@ -601,7 +545,7 @@ def fmri_quality_control(
     Returns:
         list: A list of subjects that have completed the QC process.
     """
-    print("\n\nFMRI QC\n\n")
+    print("\n\n06. FMRI QC\n\n")
     try:
         # Create QC directory
         qc_dir = os.path.join(root_path, "QC", subject_id)
@@ -703,6 +647,7 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
         root_path (str): The root path for data storage.
         output_path (str): The path to the output directory.
     """
+    print("\n\n07. COPY PREPROCESSED DATA\n\n")
     # Directory paths for the outputs
     dirs = {
         "native_t1": os.path.join(output_path, subject_id, ses, "native_T1"),
@@ -743,10 +688,10 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
         ),
         "framew_native": (
             f"{root_path}/QC/{subject_id}/framewise_displ.txt",
-            f"{dirs['native_t1']}/framewise_displ.txt"
+            f"{dirs['native_t1']}/framewise_displ.txt",
         ),
         "motion_native": (
-            f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par", #### CONVERT CHECK
+            f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",  #### CONVERT CHECK
             f"{dirs['native_t1']}/motion.txt",
         ),
         "nuisance_native": (
@@ -763,7 +708,7 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
         ),
         "framew_native": (
             f"{root_path}/QC/{subject_id}/framewise_displ.txt",
-            f"{dirs['native_t1']}/framewise_displ.txt"
+            f"{dirs['native_t1']}/framewise_displ.txt",
         ),
         "motion_mni": (
             f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",
@@ -808,7 +753,9 @@ def initialize_preprocessing_dirs(bids_dir, ses, root_path, output_path):
         paths = {
             "bold_native": os.path.join(dirs["native_t1"], f"{subject_id}_{ses}_run-01_rest_bold_ap_T1-space.nii.gz"),
             "sbref_native": os.path.join(dirs["native_t1"], f"{subject_id}_{ses}_run-01_rest_sbref_ap_T1-space.nii.gz"),
-            "framew_native": os.path.join(dirs["native_t1"], "framewise_displ.txt"), # Only one framewise displacement, motion and nuissance because the T1 and MNI ones are the same
+            "framew_native": os.path.join(
+                dirs["native_t1"], "framewise_displ.txt"
+            ),  # Only one framewise displacement, motion and nuissance because the T1 and MNI ones are the same
             "motion_native": os.path.join(dirs["native_t1"], "motion.txt"),
             "nuisance_native": os.path.join(dirs["native_t1"], "nuisance_regressors.txt"),
             "bold_mni": os.path.join(dirs["mni_2mm"], f"{subject_id}_{ses}_run-01_rest_bold_ap_MNI-space.nii.gz"),
@@ -915,8 +862,8 @@ def main():
     #### Run the preprocessing workflow ####
     ########################################
 
-    # Step 1.
-    # Setup logging for fMRI to standard transformation
+    # Step 1. Transform fMRI data to standard space
+    # Setup logging
     change_logger_file("log_01_transform_fmri_to_standard")
 
     # Define the partial function with fixed arguments
@@ -936,8 +883,8 @@ def main():
     # Filter out any None values from the results. None gets returned when an error occurs
     coregistration_list = [subject for subject in coregistration_list if subject is not None]
 
-    # Step 2.
-    # Setup logging for coregistration
+    # Step 2. Execute coregistration
+    # Setup logging
     change_logger_file("log_02_execute_coregistration")
 
     # Perform coregistration on the filtered list of subjects
@@ -950,8 +897,8 @@ def main():
     # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
     print(extract_wm_csf_masks_list)
 
-    # Step 3a.
-    # Setup logging for WM and CSF mask extraction
+    # Step 3a. Extract WM and CSF masks
+    # Setup logging
     change_logger_file("log_03a_extract_wm_csf_masks")
 
     # Apply nuisance correction initial step using multiprocessing
@@ -970,8 +917,8 @@ def main():
     nuisance_regression_list = [subject for subject in nuisance_regression_list if subject is not None]
     print(nuisance_regression_list)
 
-    # Step 3b.
-    # Setup logging for nuisance regression
+    # Step 3b. Run nuisance regression
+    # Setup logging
     change_logger_file("log_03b_run_nuisance_regression")
 
     # Execute advanced nuisance regression
@@ -981,8 +928,8 @@ def main():
         if results is not None:
             mni_normalization_list.append(results)
 
-    # Step 4.
-    # Setup logging for MNI normalization
+    # Step 4. Perform MNI normalization
+    # Setup logging
     change_logger_file("log_04_mni_normalization")
 
     # Perform MNI normalization using multiprocessing
@@ -992,8 +939,8 @@ def main():
         if results is not None:
             regression_list.append(results)
 
-    # Step 5.
-    # Setup logging for nuisance correction application
+    # Step 5. Apply nuisance correction
+    # Setup logging
     change_logger_file("log_05_apply_nuisance_correction")
 
     # Apply nuisance correction using multiprocessing
@@ -1004,8 +951,8 @@ def main():
 
     qc_list = [subject for subject in qc_list if subject is not None]
 
-    # Step 6.
-    # Setup logging for fMRI quality control
+    # Step 6. Perform fMRI quality control
+    # Setup logging
     change_logger_file("log_06_fmri_quality_control")
 
     # Perform fMRI quality control using multiprocessing
@@ -1024,8 +971,8 @@ def main():
 
     copy_subjects = [subject for subject in copy_subjects if subject is not None]
 
-    # Step 7.
-    # Setup logging for preparing and copying preprocessed data
+    # Step 7. Prepare and copy preprocessed data
+    # Setup logging
     change_logger_file("log_07_prepare_and_copy_preprocessed_data")
 
     # Prepare and copy preprocessed data using multiprocessing
