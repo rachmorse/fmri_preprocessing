@@ -691,7 +691,7 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
             f"{dirs['native_t1']}/framewise_displ.txt",
         ),
         "motion_native": (
-            f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",  #### CONVERT CHECK
+            f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",  
             f"{dirs['native_t1']}/motion.txt",
         ),
         "nuisance_native": (
@@ -702,13 +702,14 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
             f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz",
             f"{dirs['mni_2mm']}/{subject_id}_{ses}_run-01_rest_bold_ap_MNI-space.nii.gz",
         ),
+        ####### when Maria is copying this file she is simply renaming .nii to .nii.gz. Ask her about this and whether I should have the compressed or uncompressed file exported
         "sbref_mni": (
             f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
             f"{dirs['mni_2mm']}/{subject_id}_{ses}_run-01_rest_sbref_ap_MNI-space.nii.gz",
         ),
-        "framew_native": (
+        "framew_mni": (
             f"{root_path}/QC/{subject_id}/framewise_displ.txt",
-            f"{dirs['native_t1']}/framewise_displ.txt",
+            f"{dirs['mni_2mm']}/framewise_displ.txt",
         ),
         "motion_mni": (
             f"{root_path}/fmri2standard/{subject_id}/realign_fmri2SBref/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf.nii.par",
@@ -807,13 +808,14 @@ def main():
 
     This function performs the following steps:
     1. Transforms fMRI data to standard space using parallel processing.
-    2. Executes coregistration for valid subjects post transformation.
+    2. Executes coregistration post transformation.
     3. Applies nuisance correction, including:
        a. Extraction of white matter (WM) and cerebrospinal fluid (CSF) masks.
        b. Advanced nuisance regression.
     4. Conducts MNI normalization.
     5. Removes nuisance regression artifacts.
     6. Executes quality control on fMRI data.
+    7. Prepares and copies preprocessed data to the output directory.
 
     The process makes use of multiprocessing to parallelize tasks where possible,
     and logs any subjects with errors at each step.
@@ -833,7 +835,8 @@ def main():
     nuisance_correction_path = os.path.join(root_path, "nuisance_correction")
     ses = "ses-02"  # Session or timepoint for the data
     # bids_dir = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
-    output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed"
+    # output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed"
+    output_path = "/home/rachel/Desktop/Preprocessing/resting_preprocessed"
 
     # Set up FSL so it runs correctly in this script
     # Change file paths as needed
@@ -844,10 +847,10 @@ def main():
     # Set FSL to output uncompressed NIFTI files
     os.environ["FSLOUTPUTTYPE"] = "NIFTI"
 
-    # Configure MATLAB command
+    # Configure MATLAB so it runs correctly in this script
     mlab_cmd = "/usr/local/bin/matlab -nodesktop -nosplash"
 
-    # Set the SPM paths using Nipype
+    # Set the SPM paths so it runs correctly in this script
     spm.SPMCommand.set_mlab_paths(paths="/home/rachel/spm12", matlab_cmd=mlab_cmd)
 
     # Define the SPM coregistration object
