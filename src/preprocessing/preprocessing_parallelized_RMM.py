@@ -181,7 +181,7 @@ def extract_wm_csf_masks(subject_id, ses, root_path, fmri2standard_folder, recon
     """Extract white matter (WM) and cerebrospinal fluid (CSF) masks for nuisance correction.
 
     This function prepares paths, creates necessary directories, and executes
-    a mask extraction script. It logs any errors encountered during the process.
+    a mask extraction script. 
 
     Args:
         subject_id (str): The identifier for the subject being processed.
@@ -702,7 +702,6 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
             f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii.gz",
             f"{dirs['mni_2mm']}/{subject_id}_{ses}_run-01_rest_bold_ap_MNI-space.nii.gz",
         ),
-        ####### when Maria is copying this file she is simply renaming .nii to .nii.gz. Ask her about this and whether I should have the compressed or uncompressed file exported
         "sbref_mni": (
             f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii.gz",
             f"{dirs['mni_2mm']}/{subject_id}_{ses}_run-01_rest_sbref_ap_MNI-space.nii.gz",
