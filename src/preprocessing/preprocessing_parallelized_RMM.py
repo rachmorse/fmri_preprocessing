@@ -772,11 +772,18 @@ def initialize_preprocessing_dirs(bids_path, ses, output_path):
     subjects_to_process = set()
 
     for subject_id in os.listdir(bids_path):
-        subject_path = os.path.join(bids_path, subject_id)
-        # print(subject_path, os.path.exists(subject_path))
-        if os.path.isdir(subject_path):
-            subjects_to_process.add(subject_id)
+        # Ignore any entries that do not start with 'sub-'
+        if not subject_id.startswith('sub-'):
+            continue
 
+        subject_path = os.path.join(bids_path, subject_id)
+
+        # Construct the session path for the current subject
+        session_path = os.path.join(subject_path, ses)
+
+        if os.path.isdir(session_path):
+            subjects_to_process.add(subject_id)
+        
     # Filter to find subjects that still need processing
     subjects_needing_processing = {
         subject_id for subject_id in subjects_to_process if not is_processed(subject_id, ses, output_path)
@@ -857,135 +864,135 @@ def main():
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
     subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, output_path)
 
-    print(f"Subjects to process: {subjects_to_process}")
+    print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
     ########################################
     #### Run the preprocessing workflow ####
     ########################################
 
-    # Step 1. Transform fMRI data to standard space
-    # Setup logging
-    change_logger_file("log_01_transform_fmri_to_standard")
+    # # Step 1. Transform fMRI data to standard space
+    # # Setup logging
+    # change_logger_file("log_01_transform_fmri_to_standard")
 
-    # Define the partial function with fixed arguments
-    transform_partial_fmri_to_standard = partial(
-        transform_fmri_to_standard,
-        root_path=root_path,
-        ses=ses,
-        bids_path=bids_path,
-        recon_all_path=recon_all_path,
-        acparams_file=acparams_file,
-    )
+    # # Define the partial function with fixed arguments
+    # transform_partial_fmri_to_standard = partial(
+    #     transform_fmri_to_standard,
+    #     root_path=root_path,
+    #     ses=ses,
+    #     bids_path=bids_path,
+    #     recon_all_path=recon_all_path,
+    #     acparams_file=acparams_file,
+    # )
 
-    # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    with Pool(6) as pool:
-        coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
+    # # Set up a multiprocessing pool to parallelize fMRI standard space transformation
+    # with Pool(6) as pool:
+    #     coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
 
-    # Filter out any None values from the results. None gets returned when an error occurs
-    coregistration_list = [subject for subject in coregistration_list if subject is not None]
+    # # Filter out any None values from the results. None gets returned when an error occurs
+    # coregistration_list = [subject for subject in coregistration_list if subject is not None]
 
-    # Step 2. Execute coregistration
-    # Setup logging
-    change_logger_file("log_02_execute_coregistration")
+    # # Step 2. Execute coregistration
+    # # Setup logging
+    # change_logger_file("log_02_execute_coregistration")
 
-    # Perform coregistration on the filtered list of subjects
-    extract_wm_csf_masks_list = []  # Reset results for the next phase
-    for subject in coregistration_list:
-        results = execute_coregistration(subject, ses, root_path, bids_path, coreg_EPI2T1)
-        if results is not None:
-            extract_wm_csf_masks_list.append(results)
+    # # Perform coregistration on the filtered list of subjects
+    # extract_wm_csf_masks_list = []  # Reset results for the next phase
+    # for subject in coregistration_list:
+    #     results = execute_coregistration(subject, ses, root_path, bids_path, coreg_EPI2T1)
+    #     if results is not None:
+    #         extract_wm_csf_masks_list.append(results)
 
-    # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
-    print(extract_wm_csf_masks_list)
+    # # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
+    # print(extract_wm_csf_masks_list)
 
-    # Step 3a. Extract WM and CSF masks
-    # Setup logging
-    change_logger_file("log_03a_extract_wm_csf_masks")
+    # # Step 3a. Extract WM and CSF masks
+    # # Setup logging
+    # change_logger_file("log_03a_extract_wm_csf_masks")
 
-    # Apply nuisance correction initial step using multiprocessing
-    transform_partial_extract_wm_csf_masks = partial(
-        extract_wm_csf_masks,
-        ses=ses,
-        root_path=root_path,
-        recon_all_path=recon_all_path,
-    )
-    # Use multiprocessing Pool to apply the function
-    with Pool(6) as pool:
-        nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
+    # # Apply nuisance correction initial step using multiprocessing
+    # transform_partial_extract_wm_csf_masks = partial(
+    #     extract_wm_csf_masks,
+    #     ses=ses,
+    #     root_path=root_path,
+    #     recon_all_path=recon_all_path,
+    # )
+    # # Use multiprocessing Pool to apply the function
+    # with Pool(6) as pool:
+    #     nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
-    # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
-    nuisance_regression_list = [subject for subject in nuisance_regression_list if subject is not None]
-    print(nuisance_regression_list)
+    # # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
+    # nuisance_regression_list = [subject for subject in nuisance_regression_list if subject is not None]
+    # print(nuisance_regression_list)
 
-    # Step 3b. Run nuisance regression
-    # Setup logging
-    change_logger_file("log_03b_run_nuisance_regression")
+    # # Step 3b. Run nuisance regression
+    # # Setup logging
+    # change_logger_file("log_03b_run_nuisance_regression")
 
-    # Execute advanced nuisance regression
-    mni_normalization_list = []
-    for subject in nuisance_regression_list:
-        results = run_nuisance_regression(subject, ses, root_path)
-        if results is not None:
-            mni_normalization_list.append(results)
+    # # Execute advanced nuisance regression
+    # mni_normalization_list = []
+    # for subject in nuisance_regression_list:
+    #     results = run_nuisance_regression(subject, ses, root_path)
+    #     if results is not None:
+    #         mni_normalization_list.append(results)
 
-    # Step 4. Perform MNI normalization
-    # Setup logging
-    change_logger_file("log_04_mni_normalization")
+    # # Step 4. Perform MNI normalization
+    # # Setup logging
+    # change_logger_file("log_04_mni_normalization")
 
-    # Perform MNI normalization using multiprocessing
-    regression_list = []
-    for subject in mni_normalization_list:
-        results = mni_normalization(subject, ses, root_path, bids_path)
-        if results is not None:
-            regression_list.append(results)
+    # # Perform MNI normalization using multiprocessing
+    # regression_list = []
+    # for subject in mni_normalization_list:
+    #     results = mni_normalization(subject, ses, root_path, bids_path)
+    #     if results is not None:
+    #         regression_list.append(results)
 
-    # Step 5. Apply nuisance correction
-    # Setup logging
-    change_logger_file("log_05_apply_nuisance_correction")
+    # # Step 5. Apply nuisance correction
+    # # Setup logging
+    # change_logger_file("log_05_apply_nuisance_correction")
 
-    # Apply nuisance correction using multiprocessing
-    transform_partial_apply_nuisance_correction = partial(apply_nuisance_correction, ses=ses, root_path=root_path)
+    # # Apply nuisance correction using multiprocessing
+    # transform_partial_apply_nuisance_correction = partial(apply_nuisance_correction, ses=ses, root_path=root_path)
 
-    with Pool(6) as pool:
-        qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
+    # with Pool(6) as pool:
+    #     qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
-    qc_list = [subject for subject in qc_list if subject is not None]
+    # qc_list = [subject for subject in qc_list if subject is not None]
 
-    # Step 6. Perform fMRI quality control
-    # Setup logging
-    change_logger_file("log_06_fmri_quality_control")
+    # # Step 6. Perform fMRI quality control
+    # # Setup logging
+    # change_logger_file("log_06_fmri_quality_control")
 
-    # Perform fMRI quality control using multiprocessing
-    transform_partial_fmri_quality_control = partial(
-        fmri_quality_control,
-        root_path=root_path,
-        ses=ses,
-    )
+    # # Perform fMRI quality control using multiprocessing
+    # transform_partial_fmri_quality_control = partial(
+    #     fmri_quality_control,
+    #     root_path=root_path,
+    #     ses=ses,
+    # )
 
-    with Pool(6) as pool:
-        copy_subjects = pool.map(transform_partial_fmri_quality_control, qc_list)
+    # with Pool(6) as pool:
+    #     copy_subjects = pool.map(transform_partial_fmri_quality_control, qc_list)
 
-    copy_subjects = [subject for subject in copy_subjects if subject is not None]
+    # copy_subjects = [subject for subject in copy_subjects if subject is not None]
 
-    # Step 7. Prepare and copy preprocessed data
-    # Setup logging
-    change_logger_file("log_07_prepare_and_copy_preprocessed_data")
+    # # Step 7. Prepare and copy preprocessed data
+    # # Setup logging
+    # change_logger_file("log_07_prepare_and_copy_preprocessed_data")
 
-    # Prepare and copy preprocessed data using multiprocessing
-    transform_partial_prepare_and_copy = partial(
-        prepare_and_copy_preprocessed_data, ses=ses, root_path=root_path, output_path=output_path
-    )
+    # # Prepare and copy preprocessed data using multiprocessing
+    # transform_partial_prepare_and_copy = partial(
+    #     prepare_and_copy_preprocessed_data, ses=ses, root_path=root_path, output_path=output_path
+    # )
 
-    with Pool(6) as pool:
-        final_results = pool.map(transform_partial_prepare_and_copy, copy_subjects)
+    # with Pool(6) as pool:
+    #     final_results = pool.map(transform_partial_prepare_and_copy, copy_subjects)
 
-    final_results = [subject for subject in final_results if subject is not None]
+    # final_results = [subject for subject in final_results if subject is not None]
 
-    failed_subjects = subjects_to_process - set(final_results)
-    print(
-        f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"
-        + "\n".join(failed_subjects)
-    )
+    # failed_subjects = subjects_to_process - set(final_results)
+    # print(
+    #     f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"
+    #     + "\n".join(failed_subjects)
+    # )
 
 
 if __name__ == "__main__":
