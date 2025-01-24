@@ -137,10 +137,14 @@ def execute_coregistration(subject_id, ses, root_path, bids_path, coreg_EPI2T1):
         )
         shutil.copy(sbref_source, sbref_dest)
 
+        # Make a directory to store copied files locally as I have no permission to do it in the BIDS folder
+        anat_dir_local = os.path.join(root_path,"BIDS/anat")
+        os.makedirs(anat_dir_local, exist_ok=True)
+
         t1w_source = os.path.join(anat_dir, f"{subject_id}_{ses}_run-01_T1w.nii.gz")
-        t1w_dest = os.path.join(anat_dir, f"{subject_id}_{ses}_run-01_T1w_copy.nii.gz")
-        t1w_new_name = os.path.join(anat_dir, f"{subject_id}_{ses}_run-01_T1w_copy.nii")
-        t1w_dest_uncompressed = os.path.join(anat_dir, f"{subject_id}_{ses}_run-01_T1w.nii")
+        t1w_dest = os.path.join(anat_dir_local, f"{subject_id}_{ses}_run-01_T1w_copy.nii.gz")
+        t1w_new_name = os.path.join(anat_dir_local, f"{subject_id}_{ses}_run-01_T1w_copy.nii")
+        t1w_dest_uncompressed = os.path.join(anat_dir_local, f"{subject_id}_{ses}_run-01_T1w.nii")
         shutil.copy(t1w_source, t1w_dest)
         subprocess.run(["gunzip", "-f", t1w_dest], check=True)
         os.rename(t1w_new_name, t1w_dest_uncompressed)
@@ -870,129 +874,160 @@ def main():
     #### Run the preprocessing workflow ####
     ########################################
 
-    # # Step 1. Transform fMRI data to standard space
-    # # Setup logging
-    # change_logger_file("log_01_transform_fmri_to_standard")
+    # Step 1. Transform fMRI data to standard space
+    # Setup logging
+    change_logger_file("log_01_transform_fmri_to_standard")
 
-    # # Define the partial function with fixed arguments
-    # transform_partial_fmri_to_standard = partial(
-    #     transform_fmri_to_standard,
-    #     root_path=root_path,
-    #     ses=ses,
-    #     bids_path=bids_path,
-    #     recon_all_path=recon_all_path,
-    #     acparams_file=acparams_file,
-    # )
+    # Define the partial function with fixed arguments
+    transform_partial_fmri_to_standard = partial(
+        transform_fmri_to_standard,
+        root_path=root_path,
+        ses=ses,
+        bids_path=bids_path,
+        recon_all_path=recon_all_path,
+        acparams_file=acparams_file,
+    )
 
-    # # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    # with Pool(6) as pool:
-    #     coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
+    # Set up a multiprocessing pool to parallelize fMRI standard space transformation
+    with Pool(8) as pool:
+        coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
 
-    # # Filter out any None values from the results. None gets returned when an error occurs
-    # coregistration_list = [subject for subject in coregistration_list if subject is not None]
+    # Filter out any None values from the results. None gets returned when an error occurs
+    coregistration_list = [subject for subject in coregistration_list if subject is not None]
 
-    # # Step 2. Execute coregistration
-    # # Setup logging
-    # change_logger_file("log_02_execute_coregistration")
+    # Step 2. Execute coregistration
+    print(f"Subjects to process for coregistration: {len(coregistration_list)} / {len(subjects_to_process)}")
 
-    # # Perform coregistration on the filtered list of subjects
-    # extract_wm_csf_masks_list = []  # Reset results for the next phase
-    # for subject in coregistration_list:
-    #     results = execute_coregistration(subject, ses, root_path, bids_path, coreg_EPI2T1)
-    #     if results is not None:
-    #         extract_wm_csf_masks_list.append(results)
+    # Setup logging
+    change_logger_file("log_02_execute_coregistration")
 
-    # # Identify subjects needing nuisance correction to run (`extract_wm_csf_masks`), excluding those with errors from `execute_coregistration`
-    # print(extract_wm_csf_masks_list)
+    # Define the partial function with fixed arguments
+    execute_partial_coregistration = partial(
+        execute_coregistration,
+        ses=ses,
+        root_path=root_path,
+        bids_path=bids_path,
+        coreg_EPI2T1=coreg_EPI2T1,
+    )
 
-    # # Step 3a. Extract WM and CSF masks
-    # # Setup logging
-    # change_logger_file("log_03a_extract_wm_csf_masks")
+    # Set up a multiprocessing pool to parallelize fMRI standard space transformation
+    with Pool(8) as pool:
+        extract_wm_csf_masks_list = pool.map(execute_partial_coregistration, coregistration_list)
 
-    # # Apply nuisance correction initial step using multiprocessing
-    # transform_partial_extract_wm_csf_masks = partial(
-    #     extract_wm_csf_masks,
-    #     ses=ses,
-    #     root_path=root_path,
-    #     recon_all_path=recon_all_path,
-    # )
-    # # Use multiprocessing Pool to apply the function
-    # with Pool(6) as pool:
-    #     nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
+    # Filter out any None values from the results. None gets returned when an error occurs
+    extract_wm_csf_masks_list = [subject for subject in extract_wm_csf_masks_list if subject is not None]
 
-    # # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
-    # nuisance_regression_list = [subject for subject in nuisance_regression_list if subject is not None]
-    # print(nuisance_regression_list)
+    # Step 3a. Extract WM and CSF masks
+    print(f"Subjects to process for extracting WM/CSF: {len(extract_wm_csf_masks_list)} / {len(subjects_to_process)}")
 
-    # # Step 3b. Run nuisance regression
-    # # Setup logging
-    # change_logger_file("log_03b_run_nuisance_regression")
+    # Setup logging
+    change_logger_file("log_03a_extract_wm_csf_masks")
 
-    # # Execute advanced nuisance regression
-    # mni_normalization_list = []
-    # for subject in nuisance_regression_list:
-    #     results = run_nuisance_regression(subject, ses, root_path)
-    #     if results is not None:
-    #         mni_normalization_list.append(results)
+    # Apply nuisance correction initial step using multiprocessing
+    transform_partial_extract_wm_csf_masks = partial(
+        extract_wm_csf_masks,
+        ses=ses,
+        root_path=root_path,
+        recon_all_path=recon_all_path,
+    )
+    # Use multiprocessing Pool to apply the function
+    with Pool(8) as pool:
+        nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
-    # # Step 4. Perform MNI normalization
-    # # Setup logging
-    # change_logger_file("log_04_mni_normalization")
+    # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
+    nuisance_regression_list = [subject for subject in nuisance_regression_list if subject is not None]
+    print(nuisance_regression_list)
 
-    # # Perform MNI normalization using multiprocessing
-    # regression_list = []
-    # for subject in mni_normalization_list:
-    #     results = mni_normalization(subject, ses, root_path, bids_path)
-    #     if results is not None:
-    #         regression_list.append(results)
+    # Step 3b: Run nuisance regression
+    print(f"Subjects to process for nuisance workflow: {len(nuisance_regression_list)} / {len(extract_wm_csf_masks_list)}")
 
-    # # Step 5. Apply nuisance correction
-    # # Setup logging
-    # change_logger_file("log_05_apply_nuisance_correction")
+    # Setup logging
+    change_logger_file("log_03b_run_nuisance_regression")
 
-    # # Apply nuisance correction using multiprocessing
-    # transform_partial_apply_nuisance_correction = partial(apply_nuisance_correction, ses=ses, root_path=root_path)
+    # Apply nuisance regression using multiprocessing
+    transform_partial_run_nuisance_regression = partial(
+        run_nuisance_regression,
+        ses=ses,
+        root_path=root_path,
+    )
 
-    # with Pool(6) as pool:
-    #     qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
+    with Pool(8) as pool:
+        mni_normalization_list = pool.map(transform_partial_run_nuisance_regression, nuisance_regression_list)
 
-    # qc_list = [subject for subject in qc_list if subject is not None]
+    mni_normalization_list = [result for result in mni_normalization_list if result is not None]
 
-    # # Step 6. Perform fMRI quality control
-    # # Setup logging
-    # change_logger_file("log_06_fmri_quality_control")
+    # Step 4: Perform MNI normalization
+    print(f"Subjects to process for MNI normalization: {len(mni_normalization_list)} / {len(nuisance_regression_list)}")
 
-    # # Perform fMRI quality control using multiprocessing
-    # transform_partial_fmri_quality_control = partial(
-    #     fmri_quality_control,
-    #     root_path=root_path,
-    #     ses=ses,
-    # )
+    # Setup logging
+    change_logger_file("log_04_mni_normalization")
 
-    # with Pool(6) as pool:
-    #     copy_subjects = pool.map(transform_partial_fmri_quality_control, qc_list)
+    # Perform MNI normalization using multiprocessing
+    transform_partial_mni_normalization = partial(
+        mni_normalization,
+        ses=ses,
+        root_path=root_path,
+        bids_path=bids_path,
+    )
 
-    # copy_subjects = [subject for subject in copy_subjects if subject is not None]
+    with Pool(8) as pool:
+        regression_list = pool.map(transform_partial_mni_normalization, mni_normalization_list)
 
-    # # Step 7. Prepare and copy preprocessed data
-    # # Setup logging
-    # change_logger_file("log_07_prepare_and_copy_preprocessed_data")
+    regression_list = [result for result in regression_list if result is not None]
 
-    # # Prepare and copy preprocessed data using multiprocessing
-    # transform_partial_prepare_and_copy = partial(
-    #     prepare_and_copy_preprocessed_data, ses=ses, root_path=root_path, output_path=output_path
-    # )
+    # Step 5. Apply nuisance correction
+    print(f"Subjects to process for applying nuisance: {len(regression_list)} / {len(mni_normalization_list)}")
 
-    # with Pool(6) as pool:
-    #     final_results = pool.map(transform_partial_prepare_and_copy, copy_subjects)
+    # Setup logging
+    change_logger_file("log_05_apply_nuisance_correction")
 
-    # final_results = [subject for subject in final_results if subject is not None]
+    # Apply nuisance correction using multiprocessing
+    transform_partial_apply_nuisance_correction = partial(apply_nuisance_correction, ses=ses, root_path=root_path)
 
-    # failed_subjects = subjects_to_process - set(final_results)
-    # print(
-    #     f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"
-    #     + "\n".join(failed_subjects)
-    # )
+    with Pool(8) as pool:
+        qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
+
+    qc_list = [subject for subject in qc_list if subject is not None]
+
+    # Step 6. Perform fMRI quality control
+    print(f"Subjects to process for QC: {len(qc_list)} / {len(regression_list)}")
+
+    # Setup logging
+    change_logger_file("log_06_fmri_quality_control")
+
+    # Perform fMRI quality control using multiprocessing
+    transform_partial_fmri_quality_control = partial(
+        fmri_quality_control,
+        root_path=root_path,
+        ses=ses,
+    )
+
+    with Pool(8) as pool:
+        copy_subjects = pool.map(transform_partial_fmri_quality_control, qc_list)
+
+    copy_subjects = [subject for subject in copy_subjects if subject is not None]
+
+    # Step 7. Prepare and copy preprocessed data
+    print(f"Subjects to process for copying: {len(copy_subjects)} / {len(qc_list)}")
+
+    # Setup logging
+    change_logger_file("log_07_prepare_and_copy_preprocessed_data")
+
+    # Prepare and copy preprocessed data using multiprocessing
+    transform_partial_prepare_and_copy = partial(
+        prepare_and_copy_preprocessed_data, ses=ses, root_path=root_path, output_path=output_path
+    )
+
+    with Pool(8) as pool:
+        final_results = pool.map(transform_partial_prepare_and_copy, copy_subjects)
+
+    final_results = [subject for subject in final_results if subject is not None]
+
+    failed_subjects = subjects_to_process - set(final_results)
+    print(
+        f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"
+        + "\n".join(failed_subjects)
+    )
 
 
 if __name__ == "__main__":
