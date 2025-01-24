@@ -1,4 +1,4 @@
-# Ignore __pycache__ directories
 *pyc
 *.m
 *.log
+nohup.out
