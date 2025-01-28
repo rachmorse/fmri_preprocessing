@@ -170,8 +170,11 @@ def execute_coregistration(subject_id, ses, root_path, bids_path, coreg_EPI2T1):
         coreg_EPI2T1.run()
 
         # Zip back and clean up the original files AFTER all processing is done
-        subprocess.run(["gzip", sbref_dest], check=True)
-        subprocess.run(["gzip", bold_dest], check=True)
+        if not os.path.exists(f"{sbref_dest}.gz"):    # Check if the gzipped file already exists
+            subprocess.run(["gzip", sbref_dest], check=True)
+
+        if not os.path.exists(f"{bold_dest}.gz"):    # Check if the gzipped file already exists
+            subprocess.run(["gzip", bold_dest], check=True)
 
     except Exception as e:
         logging.error("Error during SPM coregistration for subject %s: %s", subject_id, e)
