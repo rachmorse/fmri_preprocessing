@@ -662,22 +662,28 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
         os.makedirs(dir_path, exist_ok=True)
 
     # First zip the files so they match output format
-    subprocess.run(
-        [
-            "gzip",
-            "-f",
-            f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii",
-        ],
-        check=True,
-    )
-    subprocess.run(
-        [
-            "gzip",
-            "-f",
-            f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii",
-        ],
-        check=True,
-    )
+
+    # Define paths for MNI BOLD file
+    bold_file = f"{root_path}/nuisance_correction/{subject_id}/filter_regressors_bold/{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1_regfilt_MNI.nii"
+    bold_file_gz = f"{bold_file}.gz"
+
+    # Check existence for the zipped BOLD file and if it does not exist, zip it. Also, make sure the BOLD file exists.
+    if not os.path.exists(bold_file_gz) and os.path.exists(bold_file):
+        subprocess.run(
+            ["gzip", "-f", bold_file],
+            check=True,
+        )
+
+    # Define paths for the sbref file
+    sbref_file = f"{root_path}/normalization/{subject_id}/w{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii"
+    sbref_file_gz = f"{sbref_file}.gz"
+
+    # Check existence for the zipped sbref file and if it does not exist, zip it. Also, make sure the sbref file exists.
+    if not os.path.exists(sbref_file_gz) and os.path.exists(bold_file):
+        subprocess.run(
+            ["gzip", "-f", sbref_file],
+            check=True,
+        )
 
     # Define source and destination paths using a dictionary
     paths = {
@@ -723,14 +729,27 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
         ),
     }
 
-    # Copy files using the paths dictionary
-    for _name, (src, dst) in paths.items():
+    # Function to attempt to copy files
+    def copy_files(src, dst):
         try:
             shutil.copy(src, dst)
+            logging.info("Successfully copied %s to %s", src, dst)
+        except FileNotFoundError:
+            logging.error("File not found during copy for subject %s: %s", subject_id, src)
+            return False
         except Exception as e:
-            logging.error("Error in copying the preprocessed files for subject %s: %s", subject_id, e)
+            logging.error("Failed to copy from %s to %s for subject %s: %s", src, dst, subject_id, e)
+            return False
+        return True
 
-    return subject_id
+    # Attempt to copy all files, tracking success
+    all_copied = True
+    for src, dst in paths.values():
+        if not copy_files(src, dst):
+            all_copied = False
+
+    # Only return the subject_id if all files were copied successfully
+    return subject_id if all_copied else None
 
 
 def initialize_preprocessing_dirs(bids_path, ses, output_path):
@@ -973,7 +992,7 @@ def main():
         bids_path=bids_path,
     )
 
-    with Pool(8) as pool:
+    with Pool(1) as pool:
         regression_list = pool.map(transform_partial_mni_normalization, mni_normalization_list)
 
     regression_list = [result for result in regression_list if result is not None]

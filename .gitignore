@@ -1,4 +1,4 @@
 *pyc
 *.m
 *.log
-nohup.out
+*.out
