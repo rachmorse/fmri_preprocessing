@@ -679,7 +679,7 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
     sbref_file_gz = f"{sbref_file}.gz"
 
     # Check existence for the zipped sbref file and if it does not exist, zip it. Also, make sure the sbref file exists.
-    if not os.path.exists(sbref_file_gz) and os.path.exists(bold_file):
+    if not os.path.exists(sbref_file_gz) and os.path.exists(sbref_file):
         subprocess.run(
             ["gzip", "-f", sbref_file],
             check=True,
@@ -992,6 +992,7 @@ def main():
         bids_path=bids_path,
     )
 
+    # This needs to run without parallel processing because (for an unknown reason) it fails when run in parallel
     with Pool(1) as pool:
         regression_list = pool.map(transform_partial_mni_normalization, mni_normalization_list)
 
