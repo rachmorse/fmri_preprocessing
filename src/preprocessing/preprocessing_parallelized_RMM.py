@@ -764,20 +764,20 @@ def initialize_preprocessing_dirs(bids_path, ses, output_path):
         set: A set containing identifiers of subjects yet to be processed.
     """
 
-    def is_processed(subject_id, ses, output_path) -> bool:
+    def is_processed(subject_id, ses, shared_output_path) -> bool:
         """Check if a subject has all the required files in the output directory.
 
         Args:
             subject_id (str): The identifier for the subject.
             ses (str): The session or timepoint for the data.
-            output_path (str): The path to the output directory for the final preprocessed data.
+            shared_output_path (str): The path to the shared (institut) output directory for the final preprocessed data.
 
         Returns:
             bool: True if all files are present, False otherwise.
         """
         dirs = {
-            "native_t1": os.path.join(output_path, subject_id, ses, "native_T1"),
-            "mni_2mm": os.path.join(output_path, subject_id, ses, "MNI_2mm"),
+            "native_t1": os.path.join(shared_output_path, subject_id, ses, "native_T1"),
+            "mni_2mm": os.path.join(shared_output_path, subject_id, ses, "MNI_2mm"),
         }
 
         paths = {
@@ -865,6 +865,7 @@ def main():
     recon_all_path = "/pool/guttmann/institut/UB/Superagers/MRI/freesurfer-reconall"
     acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
     output_path = "/home/rachel/Desktop/Preprocessing/resting_preprocessed"
+    shared_output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed"
 
     # Older paths for test running
     # bids_path = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
@@ -888,7 +889,7 @@ def main():
     coreg_EPI2T1 = spm.Coregister()
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
-    subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, output_path)
+    subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
