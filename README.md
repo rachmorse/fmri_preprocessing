@@ -48,3 +48,4 @@ This script executes the fMRI preprocessing workflow. It is designed to facilita
 - This pipeline does not use global signal regression or smoothing.
 - The script supports parallel processing for efficiency.
 - Dependencies include Nipype, SPM, FSL, and Freesurfer.
+- After running this script, to delete intermediate files that are no longer needed, run `erase_intermetiate_files.py`.
