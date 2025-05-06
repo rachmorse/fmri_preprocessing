@@ -84,7 +84,8 @@ def main():
                     os.remove(f_path)
 
         # BIDS copy 
-        anat_dir_local = os.path.join(root,f"BIDS/anat/{suj}_{ses}_run-01_T1w_copy.nii.gz")
+        anat_dir_local = os.path.join(root,f"BIDS/anat/{suj}_{ses}_run-01_T1w.nii")
+
         if os.path.exists(anat_dir_local):
             if os.path.isdir(anat_dir_local):
                 shutil.rmtree(anat_dir_local, ignore_errors=True)
