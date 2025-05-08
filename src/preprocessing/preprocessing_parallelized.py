@@ -889,10 +889,10 @@ def main():
     coreg_EPI2T1 = spm.Coregister()
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
-    # subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
+    subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
 
     # Process a single subject for testing
-    subjects_to_process = ["sub-3093"]
+    # subjects_to_process = ["sub-3093"]
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
@@ -1050,7 +1050,7 @@ def main():
 
     final_results = [subject for subject in final_results if subject is not None]
 
-    failed_subjects = subjects_to_process - set(final_results)
+    failed_subjects = set(subjects_to_process) - set(final_results)
     print(
         f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"
         + "\n".join(failed_subjects)
