@@ -889,7 +889,10 @@ def main():
     coreg_EPI2T1 = spm.Coregister()
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
-    subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
+    # subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
+
+    # Process a single subject for testing
+    subjects_to_process = ["sub-3093"]
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
