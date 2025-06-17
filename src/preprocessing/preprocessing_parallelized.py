@@ -977,7 +977,8 @@ def main():
         root_path=root_path,
     )
 
-    with Pool(8) as pool:
+    # Currently have this not running in parallel because it fails due to memory issues when run in parallel
+    with Pool(1) as pool:
         mni_normalization_list = pool.map(transform_partial_run_nuisance_regression, nuisance_regression_list)
 
     mni_normalization_list = [result for result in mni_normalization_list if result is not None]
