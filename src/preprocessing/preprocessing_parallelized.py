@@ -862,7 +862,7 @@ def main():
     ses = "ses-02"
     root_path = "/home/rachel/Desktop/Preprocessing"
     bids_path = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
-    recon_all_path = "/pool/guttmann/institut/UB/Superagers/MRI/freesurfer-reconall"
+    recon_all_path = "/pool/guttmann/institut/UB/Superagers/MRI/derivatives/freesurfer-reconall"
     acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
     output_path = "/home/rachel/Desktop/Preprocessing/resting_preprocessed"
     shared_output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed"
@@ -892,7 +892,7 @@ def main():
     subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
 
     # Process a single subject for testing
-    # subjects_to_process = ["sub-3093"]
+    # subjects_to_process = ["sub-4007"]
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
