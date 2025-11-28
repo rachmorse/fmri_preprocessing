@@ -81,7 +81,7 @@ def transform_fmri_to_standard(
         fmri2t1_wf.inputs.input_node.func_segfm_pa_img = (
             f"{bids_path}/{subject_id}/{ses}/fmap/{subject_id}_{ses}_acq-restsefm_dir-pa_run-01_epi.nii.gz"
         )
-        fmri2t1_wf.inputs.input_node.T1_brain_freesurfer_mask = f"{recon_all_path}/{subject_id}_{ses}/mri/brain.mgz"
+        fmri2t1_wf.inputs.input_node.T1_brain_freesurfer_mask = f"{recon_all_path}/{subject_id}_{ses}_run-01/mri/brain.mgz"
 
         if write_graph:
             fmri2t1_wf.write_graph()
@@ -206,7 +206,7 @@ def extract_wm_csf_masks(subject_id, ses, root_path, recon_all_path, erode=1):
         bold_filename = f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz"
         bold2T1_path = os.path.join(root_path, "fmri2standard", subject_id, "spm_coregister2T1_bold", bold_filename)
         output_masks = os.path.join(root_path, "nuisance_correction", subject_id, "masks_csf_wm")
-        aseg_folder = os.path.join(recon_all_path, f"{subject_id}_{ses}", "mri", "aseg.mgz")
+        aseg_folder = os.path.join(recon_all_path, f"{subject_id}_{ses}_run-01", "mri", "aseg.mgz")
 
         # Create necessary directories
         os.makedirs(os.path.join(root_path, "nuisance_correction", subject_id), exist_ok=True)
@@ -752,72 +752,6 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
     return subject_id if all_copied else None
 
 
-def initialize_preprocessing_dirs(bids_path, ses, output_path):
-    """Initialize directories and determine subjects needing processing.
-
-    Args:
-        bids_path (str): The path to the shared BIDS data.
-        ses (str): The session or timepoint for the data.
-        output_path (str): Path to the output directory for the final preprocessed data.
-
-    Returns:
-        set: A set containing identifiers of subjects yet to be processed.
-    """
-
-    def is_processed(subject_id, ses, shared_output_path) -> bool:
-        """Check if a subject has all the required files in the output directory.
-
-        Args:
-            subject_id (str): The identifier for the subject.
-            ses (str): The session or timepoint for the data.
-            shared_output_path (str): The path to the shared (institut) output directory for the final preprocessed data.
-
-        Returns:
-            bool: True if all files are present, False otherwise.
-        """
-        dirs = {
-            "native_t1": os.path.join(shared_output_path, subject_id, ses, "native_T1"),
-            "mni_2mm": os.path.join(shared_output_path, subject_id, ses, "MNI_2mm"),
-        }
-
-        paths = {
-            "bold_native": os.path.join(dirs["native_t1"], f"{subject_id}_{ses}_run-01_rest_bold_ap_T1-space.nii.gz"),
-            "sbref_native": os.path.join(dirs["native_t1"], f"{subject_id}_{ses}_run-01_rest_sbref_ap_T1-space.nii.gz"),
-            "framew_native": os.path.join(
-                dirs["native_t1"], "framewise_displ.txt"
-            ),  # Only one framewise displacement, motion and nuissance because the T1 and MNI ones are the same
-            "motion_native": os.path.join(dirs["native_t1"], "motion.txt"),
-            "nuisance_native": os.path.join(dirs["native_t1"], "nuisance_regressors.txt"),
-            "bold_mni": os.path.join(dirs["mni_2mm"], f"{subject_id}_{ses}_run-01_rest_bold_ap_MNI-space.nii.gz"),
-            "sbref_mni": os.path.join(dirs["mni_2mm"], f"{subject_id}_{ses}_run-01_rest_sbref_ap_MNI-space.nii.gz"),
-        }
-
-        # Check for existence of files
-        return all([os.path.exists(path) for path in paths.values()])
-
-    subjects_to_process = set()
-
-    for subject_id in os.listdir(bids_path):
-        # Ignore any entries that do not start with 'sub-'
-        if not subject_id.startswith('sub-'):
-            continue
-
-        subject_path = os.path.join(bids_path, subject_id)
-
-        # Construct the session path for the current subject
-        session_path = os.path.join(subject_path, ses)
-
-        if os.path.isdir(session_path):
-            subjects_to_process.add(subject_id)
-        
-    # Filter to find subjects that still need processing
-    subjects_needing_processing = {
-        subject_id for subject_id in subjects_to_process if not is_processed(subject_id, ses, output_path)
-    }
-
-    return subjects_needing_processing
-
-
 def change_logger_file(file_name: str):
     """Configure the logging settings for a specific processing step.
 
@@ -860,12 +794,14 @@ def main():
     """
     # Define all paths and directories for the preprocessing workflow
     ses = "ses-02"
-    root_path = "/home/rachel/Desktop/Preprocessing"
-    bids_path = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
-    recon_all_path = "/pool/guttmann/institut/UB/Superagers/MRI/freesurfer-reconall"
+    root_path = "/home/rachel/Desktop/Preprocessing/bbhi"
+    bids_path = "/pool/guttmann/institut/BBHI/MRI/BIDS"
+    recon_all_path = "/pool/guttmann/institut/BBHI/MRI/derivatives/freesurfer-reconall"
     acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
-    output_path = "/home/rachel/Desktop/Preprocessing/resting_preprocessed"
-    shared_output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed"
+    output_path = "/home/rachel/Desktop/Preprocessing/bbhi/resting_preprocessed"
+
+    # Create root dir if it doesn't exist
+    os.makedirs(root_path, exist_ok=True)
 
     # Older paths for test running
     # bids_path = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
@@ -889,10 +825,7 @@ def main():
     coreg_EPI2T1 = spm.Coregister()
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
-    subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
-
-    # Process a single subject for testing
-    # subjects_to_process = ["sub-3093"]
+    subjects_to_process = ["sub-126271", "sub-167505", "sub-85733"]
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
