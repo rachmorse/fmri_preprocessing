@@ -10,6 +10,7 @@ from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Optional
+import gzip
 
 # Custom workflow imports
 from bold2T1_wf import get_fmri2standard_wf
@@ -142,12 +143,11 @@ def execute_coregistration(subject_id, ses, root_path, bids_path, coreg_EPI2T1):
         os.makedirs(anat_dir_local, exist_ok=True)
 
         t1w_source = os.path.join(anat_dir, f"{subject_id}_{ses}_run-01_T1w.nii.gz")
-        t1w_dest = os.path.join(anat_dir_local, f"{subject_id}_{ses}_run-01_T1w_copy.nii.gz")
-        t1w_new_name = os.path.join(anat_dir_local, f"{subject_id}_{ses}_run-01_T1w_copy.nii")
         t1w_dest_uncompressed = os.path.join(anat_dir_local, f"{subject_id}_{ses}_run-01_T1w.nii")
-        shutil.copy(t1w_source, t1w_dest)
-        subprocess.run(["gunzip", "-f", t1w_dest], check=True)
-        os.rename(t1w_new_name, t1w_dest_uncompressed)
+        
+        with gzip.open(t1w_source, 'rb') as f_in:
+            with open(t1w_dest_uncompressed, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
 
         bold_source = os.path.join(
             root_path,
@@ -848,7 +848,7 @@ def main():
     )
 
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    with Pool(8) as pool:
+    with Pool(3) as pool:
         coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
 
     # Filter out any None values from the results. None gets returned when an error occurs
@@ -870,7 +870,7 @@ def main():
     )
 
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    with Pool(8) as pool:
+    with Pool(3) as pool:
         extract_wm_csf_masks_list = pool.map(execute_partial_coregistration, coregistration_list)
 
     # Filter out any None values from the results. None gets returned when an error occurs
@@ -890,7 +890,7 @@ def main():
         recon_all_path=recon_all_path,
     )
     # Use multiprocessing Pool to apply the function
-    with Pool(8) as pool:
+    with Pool(3) as pool:
         nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
     # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
@@ -945,7 +945,7 @@ def main():
     # Apply nuisance correction using multiprocessing
     transform_partial_apply_nuisance_correction = partial(apply_nuisance_correction, ses=ses, root_path=root_path)
 
-    with Pool(8) as pool:
+    with Pool(3) as pool:
         qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
     qc_list = [subject for subject in qc_list if subject is not None]
@@ -963,7 +963,7 @@ def main():
         ses=ses,
     )
 
-    with Pool(8) as pool:
+    with Pool(3) as pool:
         copy_subjects = pool.map(transform_partial_fmri_quality_control, qc_list)
 
     copy_subjects = [subject for subject in copy_subjects if subject is not None]
@@ -979,7 +979,7 @@ def main():
         prepare_and_copy_preprocessed_data, ses=ses, root_path=root_path, output_path=output_path
     )
 
-    with Pool(8) as pool:
+    with Pool(3) as pool:
         final_results = pool.map(transform_partial_prepare_and_copy, copy_subjects)
 
     final_results = [subject for subject in final_results if subject is not None]
