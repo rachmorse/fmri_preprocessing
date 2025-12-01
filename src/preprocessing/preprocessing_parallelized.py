@@ -6,6 +6,7 @@ import logging
 import os
 import shutil
 import subprocess
+import json
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
@@ -839,6 +840,48 @@ def change_logger_file(file_name: str):
     root_logger.addHandler(file_handler)
 
 
+def create_dataset_description(output_path: str):
+    """Create a BIDS-compliant dataset_description.json file.
+
+    Args:
+        output_path (str): The path to the output directory where the JSON file will be saved.
+    """
+    description = {
+        "Name": "fMRI Preprocessing Output",
+        "BIDSVersion": "1.10.1",
+        "PipelineDescription": {
+            "Name": "fMRI Preprocessing Pipeline",
+            "Version": "1.1",
+            "Software": [
+                {
+                    "Name": "FSL",
+                    "Version": "6.0.4"
+                },
+                {
+                    "Name": "SPM",
+                    "Version": "12"
+                },
+                {
+                    "Name": "FreeSurfer",
+                    "Version": "6.0"
+                }
+            ]
+        }
+    }
+
+    output_file = os.path.join(output_path, "dataset_description.json")
+    
+    # Ensure the output directory exists
+    os.makedirs(output_path, exist_ok=True)
+
+    try:
+        with open(output_file, 'w') as f:
+            json.dump(description, f, indent=2)
+        print(f"Successfully created {output_file}")
+    except Exception as e:
+        print(f"Error creating dataset_description.json: {e}")
+
+
 def main():
     """Main function for executing the preprocessing workflow of fMRI data.
 
@@ -878,6 +921,10 @@ def main():
 
     # Set FSL to output uncompressed NIFTI files
     os.environ["FSLOUTPUTTYPE"] = "NIFTI"
+
+    # Set up FreeSurfer so it runs with the same version used in BBHI
+    os.environ["FREESURFER_HOME"] = "/vol/software/freesurfer-6.0" 
+    os.environ["PATH"] = f"{os.environ['FREESURFER_HOME']}/bin:" + os.environ["PATH"]
 
     # Configure MATLAB so it runs correctly in this script
     mlab_cmd = "/usr/local/bin/matlab -nodesktop -nosplash"
@@ -1056,6 +1103,9 @@ def main():
         f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"
         + "\n".join(failed_subjects)
     )
+
+    # Create the dataset description JSON file
+    create_dataset_description(output_path)
 
 
 if __name__ == "__main__":
