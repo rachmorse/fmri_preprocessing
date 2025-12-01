@@ -808,12 +808,16 @@ def main():
 
     # Set up FSL so it runs correctly in this script
     # Change file paths as needed
-    os.environ["FSLDIR"] = "/home/rachel/fsl"
+    os.environ["FSLDIR"] = "/vol/software/fsl"
     os.environ["PATH"] = f"{os.environ['FSLDIR']}/bin:" + os.environ["PATH"]
-    subprocess.run(["bash", "-c", "source /home/rachel/fsl/etc/fslconf/fsl.sh"], check=True)
+    subprocess.run(["bash", "-c", "source /vol/software/fsl/etc/fslconf/fsl.sh"], check=True)
 
     # Set FSL to output uncompressed NIFTI files
     os.environ["FSLOUTPUTTYPE"] = "NIFTI"
+
+    # Set up FreeSurfer so it runs with the same version used in BBHI
+    os.environ["FREESURFER_HOME"] = "/vol/software/freesurfer-6.0" 
+    os.environ["PATH"] = f"{os.environ['FREESURFER_HOME']}/bin:" + os.environ["PATH"]
 
     # Configure MATLAB so it runs correctly in this script
     mlab_cmd = "/usr/local/bin/matlab -nodesktop -nosplash"
