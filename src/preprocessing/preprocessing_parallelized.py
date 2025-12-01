@@ -10,6 +10,7 @@ from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Optional
+import gzip
 
 # Custom workflow imports
 from bold2T1_wf import get_fmri2standard_wf
@@ -142,12 +143,11 @@ def execute_coregistration(subject_id, ses, root_path, bids_path, coreg_EPI2T1):
         os.makedirs(anat_dir_local, exist_ok=True)
 
         t1w_source = os.path.join(anat_dir, f"{subject_id}_{ses}_run-01_T1w.nii.gz")
-        t1w_dest = os.path.join(anat_dir_local, f"{subject_id}_{ses}_run-01_T1w_copy.nii.gz")
-        t1w_new_name = os.path.join(anat_dir_local, f"{subject_id}_{ses}_run-01_T1w_copy.nii")
         t1w_dest_uncompressed = os.path.join(anat_dir_local, f"{subject_id}_{ses}_run-01_T1w.nii")
-        shutil.copy(t1w_source, t1w_dest)
-        subprocess.run(["gunzip", "-f", t1w_dest], check=True)
-        os.rename(t1w_new_name, t1w_dest_uncompressed)
+        
+        with gzip.open(t1w_source, 'rb') as f_in:
+            with open(t1w_dest_uncompressed, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
 
         bold_source = os.path.join(
             root_path,
@@ -872,9 +872,9 @@ def main():
 
     # Set up FSL so it runs correctly in this script
     # Change file paths as needed
-    os.environ["FSLDIR"] = "/home/rachel/fsl"
+    os.environ["FSLDIR"] = "/vol/software/fsl"
     os.environ["PATH"] = f"{os.environ['FSLDIR']}/bin:" + os.environ["PATH"]
-    subprocess.run(["bash", "-c", "source /home/rachel/fsl/etc/fslconf/fsl.sh"], check=True)
+    subprocess.run(["bash", "-c", "source /vol/software/fsl/etc/fslconf/fsl.sh"], check=True)
 
     # Set FSL to output uncompressed NIFTI files
     os.environ["FSLOUTPUTTYPE"] = "NIFTI"
