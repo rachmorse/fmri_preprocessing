@@ -5,6 +5,7 @@
 import logging
 import os
 import shutil
+from socket import socket
 import subprocess
 import json
 from functools import partial
@@ -12,6 +13,7 @@ from multiprocessing import Pool
 from pathlib import Path
 from typing import Optional
 import gzip
+from datetime import datetime
 
 # Custom workflow imports
 from bold2T1_wf import get_fmri2standard_wf
@@ -840,36 +842,69 @@ def change_logger_file(file_name: str):
     root_logger.addHandler(file_handler)
 
 
-def create_dataset_description(output_path: str):
+def create_dataset_description(output_path: str, spm_path: Path, final_subjects: str):
     """Create a BIDS-compliant dataset_description.json file.
 
     Args:
         output_path (str): The path to the output directory where the JSON file will be saved.
+        spm_path (Path): The path to the SPM installation directory.
+        final_subjects (str): A string listing the subjects that were processed.
     """
+    # Get the versions of FSL, FreeSurfer, and SPM
+    try:
+        with open(os.path.join(os.environ["FSLDIR"], "etc", "fslversion")) as f:
+            fsl_version = f.read().strip()
+    except:
+        fsl_version = "unknown"
+
+    try:
+        with open(os.path.join(os.environ["FREESURFER_HOME"], "build-stamp.txt")) as f:
+            freesurfer_version = f.read().strip()
+    except:
+        freesurfer_version = "unknown"
+
+    try:
+        spm_version = "unknown"
+        with open(spm_path / "Contents.m") as f:
+            for line in f:
+                if "Version" in line and "SPM" in line:
+                    spm_version = line.strip().lstrip('% ').strip()
+                    break
+    except:
+        spm_version = "unknown"
+
+    # Get the date in YYYY-MM-DD format
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    
+    # Get the hostname of the machine
+    hostname = socket.gethostname()
+
     description = {
-        "Name": "fMRI Preprocessing Output",
+        "Name": "fMRI Preprocessing Output " + current_date,
         "BIDSVersion": "1.10.1",
         "PipelineDescription": {
             "Name": "fMRI Preprocessing Pipeline",
             "Version": "1.1",
+            "RunOnMachine": hostname,
             "Software": [
                 {
                     "Name": "FSL",
-                    "Version": "6.0.4"
+                    "Version": fsl_version
                 },
                 {
                     "Name": "SPM",
-                    "Version": "12"
+                    "Version": spm_version
                 },
                 {
                     "Name": "FreeSurfer",
-                    "Version": "6.0"
+                    "Version": freesurfer_version
                 }
-            ]
+            ],
+            "SubjectsProcessed": final_subjects, 
         }
     }
 
-    output_file = os.path.join(output_path, "dataset_description.json")
+    output_file = os.path.join(output_path, f"dataset_description_{current_date}.json")
     
     # Ensure the output directory exists
     os.makedirs(output_path, exist_ok=True)
@@ -915,9 +950,9 @@ def main():
 
     # Set up FSL so it runs correctly in this script
     # Change file paths as needed
-    os.environ["FSLDIR"] = "/vol/software/fsl"
+    os.environ["FSLDIR"] = "/vol/software/fsl_6_0_4"
     os.environ["PATH"] = f"{os.environ['FSLDIR']}/bin:" + os.environ["PATH"]
-    subprocess.run(["bash", "-c", "source /vol/software/fsl/etc/fslconf/fsl.sh"], check=True)
+    subprocess.run(["bash", "-c", "source /vol/software/fsl_6_0_4/etc/fslconf/fsl.sh"], check=True)
 
     # Set FSL to output uncompressed NIFTI files
     os.environ["FSLOUTPUTTYPE"] = "NIFTI"
@@ -930,7 +965,8 @@ def main():
     mlab_cmd = "/usr/local/bin/matlab -nodesktop -nosplash"
 
     # Set the SPM paths so it runs correctly in this script
-    spm.SPMCommand.set_mlab_paths(paths="/home/rachel/spm12", matlab_cmd=mlab_cmd)
+    spm_path = Path("/home/rachel/spm12")
+    spm.SPMCommand.set_mlab_paths(paths=str(spm_path), matlab_cmd=mlab_cmd)
 
     # Define the SPM coregistration object
     coreg_EPI2T1 = spm.Coregister()
@@ -1105,7 +1141,7 @@ def main():
     )
 
     # Create the dataset description JSON file
-    create_dataset_description(output_path)
+    create_dataset_description(output_path, spm_path, final_results)
 
 
 if __name__ == "__main__":
