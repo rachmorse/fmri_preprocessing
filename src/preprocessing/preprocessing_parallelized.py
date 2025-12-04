@@ -5,7 +5,7 @@
 import logging
 import os
 import shutil
-from socket import socket
+import socket
 import subprocess
 import json
 from functools import partial
@@ -879,6 +879,9 @@ def create_dataset_description(output_path: str, spm_path: Path, final_subjects:
     # Get the hostname of the machine
     hostname = socket.gethostname()
 
+    # Get the current user
+    user = os.getlogin()
+
     description = {
         "Name": "fMRI Preprocessing Output " + current_date,
         "BIDSVersion": "1.10.1",
@@ -886,6 +889,7 @@ def create_dataset_description(output_path: str, spm_path: Path, final_subjects:
             "Name": "fMRI Preprocessing Pipeline",
             "Version": "1.1",
             "RunOnMachine": hostname,
+            "RunByUser": user,
             "Software": [
                 {
                     "Name": "FSL",
