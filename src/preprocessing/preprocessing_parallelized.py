@@ -4,6 +4,16 @@
 
 import logging
 import os
+
+# Set environment variables to limit thread usage to 1 per process
+# This ensures that when using multiprocessing.Pool(N), we use exactly N cores.
+# If these are not set, 3b will grab all available cores potentially causing crashes.
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+
 import shutil
 import socket
 import subprocess
@@ -942,15 +952,14 @@ def main():
     """
     # Define all paths and directories for the preprocessing workflow
     ses = "ses-02"
-    root_path = "/home/rachel/Desktop/Preprocessing"
+    root_path = "/home/rachel/Desktop/preprocessing-updated_reconall"
     bids_path = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
-    recon_all_path = "/pool/guttmann/institut/UB/Superagers/MRI/derivatives/freesurfer-reconall"
+    recon_all_path = "/pool/guttmann/institut/UB/Superagers/MRI/derivatives/freesurfer_6_reconall"
     acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
-    output_path = "/home/rachel/Desktop/Preprocessing/resting_preprocessed"
-    shared_output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed"
-
-    # Older paths for test running
-    # bids_path = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
+    output_path = "/home/rachel/Desktop/preprocessing-updated_reconall/resting_preprocessed/"
+    # shared_output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed"
+    # temp change to nonexistant path to process all subs
+    shared_output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed_updated"
 
     # Set up FSL so it runs correctly in this script
     # Change file paths as needed
@@ -976,10 +985,19 @@ def main():
     coreg_EPI2T1 = spm.Coregister()
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
-    subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
+    # subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
 
-    # Process a single subject for testing
-    # subjects_to_process = ["sub-4007"]
+    # Process a manual list
+    subjects_to_process = ['sub-4121', 'sub-1023', 'sub-1175', 'sub-4026', 'sub-4062', 
+                           'sub-3106', 'sub-4019', 'sub-4018', 'sub-3034', 'sub-1283', 
+                           'sub-3070', 'sub-3012', 'sub-4092', 'sub-3060', 'sub-3109', 
+                           'sub-3036', 'sub-3100', 'sub-3098', 'sub-1031', 'sub-3084', 
+                           'sub-4120', 'sub-4059', 'sub-3125', 'sub-4145', 'sub-3086', 
+                           'sub-3044', 'sub-2003', 'sub-1133', 'sub-3072', 'sub-3082', 
+                           'sub-3020', 'sub-4064', 'sub-1188', 'sub-1251', 'sub-4027', 
+                           'sub-1144', 'sub-3009', 'sub-4028', 'sub-4003', 'sub-3120', 
+                           'sub-3039', 'sub-1239', 'sub-3004', 'sub-3031', 'sub-3127', 
+                           'sub-4067', 'sub-4150', 'sub-4075']
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
@@ -1002,7 +1020,7 @@ def main():
     )
 
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    with Pool(8) as pool:
+    with Pool(10) as pool:
         coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
 
     # Filter out any None values from the results. None gets returned when an error occurs
@@ -1024,7 +1042,7 @@ def main():
     )
 
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    with Pool(8) as pool:
+    with Pool(10) as pool:
         extract_wm_csf_masks_list = pool.map(execute_partial_coregistration, coregistration_list)
 
     # Filter out any None values from the results. None gets returned when an error occurs
@@ -1044,7 +1062,7 @@ def main():
         recon_all_path=recon_all_path,
     )
     # Use multiprocessing Pool to apply the function
-    with Pool(8) as pool:
+    with Pool(10) as pool:
         nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
     # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
@@ -1064,8 +1082,8 @@ def main():
         root_path=root_path,
     )
 
-    # Currently have this not running in parallel because it fails due to memory issues when run in parallel
-    with Pool(1) as pool:
+    # Runs with 3 cores because fsl_regfilt uses a lot of memory
+    with Pool(3) as pool:
         mni_normalization_list = pool.map(transform_partial_run_nuisance_regression, nuisance_regression_list)
 
     mni_normalization_list = [result for result in mni_normalization_list if result is not None]
@@ -1099,7 +1117,8 @@ def main():
     # Apply nuisance correction using multiprocessing
     transform_partial_apply_nuisance_correction = partial(apply_nuisance_correction, ses=ses, root_path=root_path)
 
-    with Pool(8) as pool:
+    # Runs with 3 cores because fsl_regfilt uses a lot of memory
+    with Pool(3) as pool:
         qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
     qc_list = [subject for subject in qc_list if subject is not None]
@@ -1117,7 +1136,7 @@ def main():
         ses=ses,
     )
 
-    with Pool(8) as pool:
+    with Pool(10) as pool:
         copy_subjects = pool.map(transform_partial_fmri_quality_control, qc_list)
 
     copy_subjects = [subject for subject in copy_subjects if subject is not None]
@@ -1133,7 +1152,7 @@ def main():
         prepare_and_copy_preprocessed_data, ses=ses, root_path=root_path, output_path=output_path
     )
 
-    with Pool(8) as pool:
+    with Pool(10) as pool:
         final_results = pool.map(transform_partial_prepare_and_copy, copy_subjects)
 
     final_results = [subject for subject in final_results if subject is not None]
