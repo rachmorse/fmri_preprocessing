@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from nipype import Node, Workflow, interfaces
+from nipype.interfaces import freesurfer, fsl, utility
 
 
-def get_fmri2standard_wf(tvols, subject_id, ACQ_PARAMS):
+def get_fmri2standard_wf(tvols, subject_id, acq_params):
     """Estimates transformation from Gradient Field Distortion-warped BOLD to T1.
 
     In general:
@@ -21,14 +23,11 @@ def get_fmri2standard_wf(tvols, subject_id, ACQ_PARAMS):
     Args:
         tvols (list): List containing [t_initial, t_final] volumes included in the preprocess.
         subject_id (str): Subject identifier.
-        ACQ_PARAMS (str): Path to txt file containing MRI acquisition parameters; needs to be specified for topup correction.
+        acq_params (str): Path to txt file containing MRI acquisition parameters; needs to be specified for topup correction.
 
     Returns:
         nipype.pipeline.engine.Workflow: The configured workflow for BOLD to T1 transformation.
     """
-    from nipype import Node, Workflow, interfaces
-    from nipype.interfaces import freesurfer, fsl, utility
-
     print("Defining workflow...")
     wf = Workflow(name=subject_id, base_dir="")
 
@@ -96,7 +95,7 @@ def get_fmri2standard_wf(tvols, subject_id, ACQ_PARAMS):
     print("Estimates TopUp inhomogeneity correction from SEfm_AP and SEfm_PA...")
     node_topup_SEgfm = Node(
         fsl.TOPUP(
-            encoding_file=ACQ_PARAMS,
+            encoding_file=acq_params,
         ),
         name="Topup_SEgfm_estimation",
     )
@@ -104,7 +103,7 @@ def get_fmri2standard_wf(tvols, subject_id, ACQ_PARAMS):
     print("Applies warp from TOPUP to correct SBref...")
     node_apply_topup_to_SBref = Node(
         fsl.ApplyTOPUP(
-            encoding_file=ACQ_PARAMS,
+            encoding_file=acq_params,
             method="jac",  # jacobian modulation
             interp="spline",  # interpolation method
         ),
@@ -114,7 +113,7 @@ def get_fmri2standard_wf(tvols, subject_id, ACQ_PARAMS):
     print("Applies warp from TOPUP to correct realigned BOLD...")
     node_apply_topup = Node(
         fsl.ApplyTOPUP(
-            encoding_file=ACQ_PARAMS,
+            encoding_file=acq_params,
             method="jac",  # jacobian modulation
             interp="spline",  # interpolation method
         ),
@@ -139,7 +138,7 @@ def get_fmri2standard_wf(tvols, subject_id, ACQ_PARAMS):
     print("Transform brain mask T1 from freesurfer space to T1 space")
     node_vol2vol_brain = Node(
         freesurfer.ApplyVolTransform(
-            reg_header=True, 
+            reg_header=True,
             transformed_file="brainmask_warped.nii.gz",
         ),
         name="vol2vol",
@@ -148,21 +147,21 @@ def get_fmri2standard_wf(tvols, subject_id, ACQ_PARAMS):
     print("Transform brain mask T1 to binary mask")
     node_bin_mask_brain = Node(
         fsl.UnaryMaths(  # fslmaths T1_brain -bin T1_binarized mask
-            operation="bin", 
+            operation="bin",
         ),
         name="binarize_mask",
     )
 
     node_extract_mask = Node(
         fsl.BinaryMaths(  # fslmaths T1 -mul T1_binarized_mask T1_extracted_mask
-            operation="mul"  
+            operation="mul"
         ),
         name="extract_mask",
     )
 
     print("...")
     print("Setting OUTPUT node...")
-    
+
     node_output = Node(
         interfaces.utility.IdentityInterface(
             fields=[
@@ -182,10 +181,6 @@ def get_fmri2standard_wf(tvols, subject_id, ACQ_PARAMS):
 
     print("All nodes created; Starts creating connections")
 
-    inputs = []
-    connections = []
-    ...
-    node_connections = [*inputs, *connections, ...]
 
     # Connects nodes
     wf.connect([

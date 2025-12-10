@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-This script defines the workflow for nuisance regression in fMRI data.
+# -*- coding: utf-8 -*
+"""This script defines the workflow for nuisance regression in fMRI data.
 It includes steps for motion correction, cosine filtering, and CompCor (WM/CSF) regression.
 """
 
@@ -21,6 +20,7 @@ def motion_regressors(realign_movpar_txt, output_dir, order=0, derivatives=1):
         str: The file path of the generated motion regressors text file.
     """
     import os
+
     import numpy as np
 
     params = np.genfromtxt(realign_movpar_txt)
@@ -38,7 +38,7 @@ def motion_regressors(realign_movpar_txt, output_dir, order=0, derivatives=1):
 
     # Note: Higher order expansions (e.g., quadratic) are currently not used/implemented
     # but the structure allows for it if 'order' > 0 loop is uncommented/implemented.
-    
+
     filename = os.path.join(output_dir, "motion_regressor.txt")
     np.savetxt(filename, out_params, fmt="%.10f")
     return filename
@@ -57,6 +57,7 @@ def cosine_filter_txt(timepoints, timestep, output_dir, period_cut=128):
         str: The file path of the generated cosine filter text file.
     """
     import os
+
     import nipype.algorithms.confounds as cf
     import numpy as np
 
@@ -90,14 +91,12 @@ def get_nuisance_regressors_wf(outdir, timepoints, subject_id, global_signal=Fal
         nipype.pipeline.engine.Workflow: The configured nuisance regression workflow.
     """
     import os
+
     from nipype import Node, Workflow
     from nipype.algorithms import confounds
     from nipype.interfaces import fsl, utility
 
-    if global_signal:
-        gb = "_GB"
-    else:
-        gb = ""
+    gb = "_GB" if global_signal else ""
 
     wf_reg = Workflow(name=subject_id + gb, base_dir=outdir)
 
@@ -224,13 +223,13 @@ def merge_nuisance_regressors(nuisance_txts, output_dir, standardize=True):
         str: The file path of the combined nuisance regressors text file.
     """
     import os
+
     import numpy as np
 
-    out_files = []
     txts_values = []
     for txt in nuisance_txts:
         txt_values = np.genfromtxt(txt)
-        
+
         # Handle 1D arrays (single regressor)
         if txt_values.ndim == 1:
             txt_values = np.matrix(txt_values)
@@ -247,12 +246,12 @@ def merge_nuisance_regressors(nuisance_txts, output_dir, standardize=True):
                 print("h")
                 txt_values = (txt_values - txt_values.mean(axis=0)) / np.std(txt_values, axis=0)
             txts_values.append(txt_values)
-    
+
         out_params = np.hstack((txts_values))
 
     # Add a column of ones (intercept)
     out_params = np.hstack((np.ones((len(out_params), 1)), out_params))
-    
+
     filename = os.path.join(output_dir, "all_nuisances.txt")
     print(filename)
     np.savetxt(filename, out_params, fmt="%.10f")
