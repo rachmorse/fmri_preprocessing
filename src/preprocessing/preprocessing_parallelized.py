@@ -765,11 +765,11 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
     return subject_id if all_copied else None
 
 
-def initialize_preprocessing_dirs(bids_path, ses, output_path):
+def initialize_preprocessing_dirs(recon_all_path, ses, output_path):
     """Initialize directories and determine subjects needing processing.
 
     Args:
-        bids_path (str): The path to the shared BIDS data.
+        recon_all_path (str): The path to the recon-all data.
         ses (str): The session or timepoint for the data.
         output_path (str): Path to the output directory for the final preprocessed data.
 
@@ -810,17 +810,14 @@ def initialize_preprocessing_dirs(bids_path, ses, output_path):
 
     subjects_to_process = set()
 
-    for subject_id in os.listdir(bids_path):
-        # Ignore any entries that do not start with 'sub-'
-        if not subject_id.startswith('sub-'):
+    for subject_id in os.listdir(recon_all_path):
+        # Ignore any entries that do not start with 'sub-' or do not match the session
+        if not (subject_id.startswith("sub-") and ses in subject_id):
             continue
 
-        subject_path = os.path.join(bids_path, subject_id)
+        subject_path = os.path.join(recon_all_path, subject_id)
 
-        # Construct the session path for the current subject
-        session_path = os.path.join(subject_path, ses)
-
-        if os.path.isdir(session_path):
+        if os.path.isdir(subject_path):
             subjects_to_process.add(subject_id)
         
     # Filter to find subjects that still need processing
