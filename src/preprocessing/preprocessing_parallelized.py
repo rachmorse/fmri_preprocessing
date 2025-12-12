@@ -849,13 +849,14 @@ def change_logger_file(file_name: str):
     root_logger.addHandler(file_handler)
 
 
-def create_dataset_description(output_path: str, spm_path: Path, final_subjects: str):
+def create_dataset_description(output_path: str, spm_path: Path, final_subjects: str, ses: str):
     """Create a BIDS-compliant dataset_description.json file.
 
     Args:
         output_path (str): The path to the output directory where the JSON file will be saved.
         spm_path (Path): The path to the SPM installation directory.
         final_subjects (str): A string listing the subjects that were processed.
+        ses (str): The session or timepoint for the data.
     """
     # Get the versions of FSL, FreeSurfer, and SPM
     try:
@@ -880,8 +881,8 @@ def create_dataset_description(output_path: str, spm_path: Path, final_subjects:
     except:
         spm_version = "unknown"
 
-    # Get the date in YYYY-MM-DD format
-    current_date = datetime.now().strftime("%Y-%m-%d")
+    # Get the exact time
+    current_date = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     
     # Get the hostname of the machine
     hostname = socket.gethostname()
@@ -912,6 +913,7 @@ def create_dataset_description(output_path: str, spm_path: Path, final_subjects:
                 }
             ],
             "SubjectsProcessed": final_subjects, 
+            "Session": ses
         }
     }
 
@@ -985,16 +987,15 @@ def main():
     # subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
 
     # Process a manual list
-    subjects_to_process = ['sub-4121', 'sub-1023', 'sub-1175', 'sub-4026', 'sub-4062', 
-                           'sub-3106', 'sub-4019', 'sub-4018', 'sub-3034', 'sub-1283', 
-                           'sub-3070', 'sub-3012', 'sub-4092', 'sub-3060', 'sub-3109', 
-                           'sub-3036', 'sub-3100', 'sub-3098', 'sub-1031', 'sub-3084', 
-                           'sub-4120', 'sub-4059', 'sub-3125', 'sub-4145', 'sub-3086', 
-                           'sub-3044', 'sub-2003', 'sub-1133', 'sub-3072', 'sub-3082', 
-                           'sub-3020', 'sub-4064', 'sub-1188', 'sub-1251', 'sub-4027', 
-                           'sub-1144', 'sub-3009', 'sub-4028', 'sub-4003', 'sub-3120', 
-                           'sub-3039', 'sub-1239', 'sub-3004', 'sub-3031', 'sub-3127', 
-                           'sub-4067', 'sub-4150', 'sub-4075']
+    subjects_to_process = ['sub-1046', 'sub-4031', 'sub-1052', 'sub-4007', 
+                           'sub-1234', 'sub-4056', 'sub-4115', 'sub-4005', 
+                           'sub-3081', 'sub-3071', 'sub-3054', 'sub-1171', 
+                           'sub-4070', 'sub-4051', 'sub-3118', 'sub-3035', 
+                           'sub-3016', 'sub-4010', 'sub-4025', 'sub-4078', 
+                           'sub-3018', 'sub-4103', 'sub-3108', 'sub-1026', 
+                           'sub-4061', 'sub-4011', 'sub-4132', 'sub-3123', 
+                           'sub-1323', 'sub-3087', 'sub-4069', 'sub-1057', 
+                           'sub-2008', 'sub-3043', 'sub-1191']
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
@@ -1161,7 +1162,7 @@ def main():
     )
 
     # Create the dataset description JSON file
-    create_dataset_description(output_path, spm_path, final_results)
+    create_dataset_description(output_path, spm_path, final_results, ses)
 
 
 if __name__ == "__main__":
