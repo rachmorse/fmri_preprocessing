@@ -828,7 +828,7 @@ def initialize_preprocessing_dirs(recon_all_path, ses, output_path):
     return subjects_needing_processing
 
 
-def change_logger_file(file_name: str):
+def change_logger_file(file_name: str, log_dir: str = "logs"):
     """Configure the logging settings for a specific processing step.
 
     This function sets up a logging configuration that writes logs to a file
@@ -844,7 +844,9 @@ def change_logger_file(file_name: str):
 
     log_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%dT%H:%M:%S")
 
-    file_handler = logging.FileHandler(f"{file_name}.log", mode="w")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, f"{file_name}.log")
+    file_handler = logging.FileHandler(log_path, mode="w")
     file_handler.setFormatter(log_formatter)
     root_logger.addHandler(file_handler)
 
