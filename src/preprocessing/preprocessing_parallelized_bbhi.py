@@ -794,17 +794,14 @@ def main():
     """
     # Define all paths and directories for the preprocessing workflow
     ses = "ses-02"
-    root_path = "/home/rachel/Desktop/Preprocessing/bbhi"
+    root_path = "/home/rachel/Desktop/preprocessing-updated_reconall/bbhi"
     bids_path = "/pool/guttmann/institut/BBHI/MRI/BIDS"
-    recon_all_path = "/pool/guttmann/institut/BBHI/MRI/derivatives/freesurfer-reconall"
+    recon_all_path = "/pool/guttmann/institut/BBHI/MRI/derivatives/reconall_fs6"
     acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
-    output_path = "/home/rachel/Desktop/Preprocessing/bbhi/resting_preprocessed"
+    output_path = "/home/rachel/Desktop/preprocessing-updated_reconall/bbhi/resting_preprocessed"
 
     # Create root dir if it doesn't exist
     os.makedirs(root_path, exist_ok=True)
-
-    # Older paths for test running
-    # bids_path = "/home/rachel/Desktop/institute/UB/Superagers/MRI/BIDS"
 
     # Set up FSL so it runs correctly in this script
     # Change file paths as needed
@@ -829,7 +826,7 @@ def main():
     coreg_EPI2T1 = spm.Coregister()
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
-    subjects_to_process = ["sub-126271", "sub-167505", "sub-85733"]
+    subjects_to_process = ["sub-57606", "sub-159747"]
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
