@@ -950,15 +950,13 @@ def main():
     Paths for inputs and logs are defined relative to the workflow's root directory.
     """
     # Define all paths and directories for the preprocessing workflow
-    ses = "ses-02"
+    ses = "ses-01"
     root_path = "/home/rachel/Desktop/preprocessing-updated_reconall"
     bids_path = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
-    recon_all_path = "/pool/guttmann/institut/UB/Superagers/MRI/derivatives/freesurfer_6_reconall"
+    recon_all_path = "/pool/guttmann/institut/UB/Superagers/MRI/derivatives/reconall_fs6"
     acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
     output_path = "/home/rachel/Desktop/preprocessing-updated_reconall/resting_preprocessed/"
-    # shared_output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed"
-    # temp change to nonexistant path to process all subs
-    shared_output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preprocessed_updated"
+    shared_output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preproc_fs6-recon"
 
     # Set up FSL so it runs correctly in this script
     # Change file paths as needed
@@ -987,15 +985,7 @@ def main():
     # subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
 
     # Process a manual list
-    subjects_to_process = ['sub-1046', 'sub-4031', 'sub-1052', 'sub-4007', 
-                           'sub-1234', 'sub-4056', 'sub-4115', 'sub-4005', 
-                           'sub-3081', 'sub-3071', 'sub-3054', 'sub-1171', 
-                           'sub-4070', 'sub-4051', 'sub-3118', 'sub-3035', 
-                           'sub-3016', 'sub-4010', 'sub-4025', 'sub-4078', 
-                           'sub-3018', 'sub-4103', 'sub-3108', 'sub-1026', 
-                           'sub-4061', 'sub-4011', 'sub-4132', 'sub-3123', 
-                           'sub-1323', 'sub-3087', 'sub-4069', 'sub-1057', 
-                           'sub-2008', 'sub-3043', 'sub-1191']
+    subjects_to_process = ['sub-1189', 'sub-4045', 'sub-4145']
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
