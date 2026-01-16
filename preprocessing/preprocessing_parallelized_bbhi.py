@@ -4,13 +4,26 @@
 
 import logging
 import os
+
+# Set environment variables to limit thread usage to 1 per process
+# This ensures that when using multiprocessing.Pool(N), we use exactly N cores.
+# If these are not set, 3b will grab all available cores potentially causing crashes.
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+
 import shutil
+import socket
 import subprocess
+import json
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
 from typing import Optional
 import gzip
+from datetime import datetime
 
 # Custom workflow imports
 from bold2T1_wf import get_fmri2standard_wf
@@ -752,7 +765,7 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
     return subject_id if all_copied else None
 
 
-def change_logger_file(file_name: str):
+def change_logger_file(file_name: str, log_dir: str = "logs_bbhi"):
     """Configure the logging settings for a specific processing step.
 
     This function sets up a logging configuration that writes logs to a file
@@ -768,9 +781,92 @@ def change_logger_file(file_name: str):
 
     log_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%dT%H:%M:%S")
 
-    file_handler = logging.FileHandler(f"{file_name}.log", mode="w")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, f"{file_name}.log")
+    file_handler = logging.FileHandler(log_path, mode="w")
     file_handler.setFormatter(log_formatter)
     root_logger.addHandler(file_handler)
+
+
+def create_dataset_description(output_path: str, spm_path: Path, final_subjects: str, ses: str):
+    """Create a BIDS-compliant dataset_description.json file.
+
+    Args:
+        output_path (str): The path to the output directory where the JSON file will be saved.
+        spm_path (Path): The path to the SPM installation directory.
+        final_subjects (str): A string listing the subjects that were processed.
+        ses (str): The session or timepoint for the data.
+    """
+    # Get the versions of FSL, FreeSurfer, and SPM
+    try:
+        with open(os.path.join(os.environ["FSLDIR"], "etc", "fslversion")) as f:
+            fsl_version = f.read().strip()
+    except:
+        fsl_version = "unknown"
+
+    try:
+        with open(os.path.join(os.environ["FREESURFER_HOME"], "build-stamp.txt")) as f:
+            freesurfer_version = f.read().strip()
+    except:
+        freesurfer_version = "unknown"
+
+    try:
+        spm_version = "unknown"
+        with open(spm_path / "Contents.m") as f:
+            for line in f:
+                if "Version" in line and "SPM" in line:
+                    spm_version = line.strip().lstrip('% ').strip()
+                    break
+    except:
+        spm_version = "unknown"
+
+    # Get the exact time
+    current_date = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    
+    # Get the hostname of the machine
+    hostname = socket.gethostname()
+
+    # Get the current user
+    user = os.getlogin()
+
+    description = {
+        "Name": "fMRI Preprocessing Output " + current_date,
+        "BIDSVersion": "1.10.1",
+        "PipelineDescription": {
+            "Name": "fMRI Preprocessing Pipeline",
+            "Version": "1.1",
+            "RunOnMachine": hostname,
+            "RunByUser": user,
+            "Software": [
+                {
+                    "Name": "FSL",
+                    "Version": fsl_version
+                },
+                {
+                    "Name": "SPM",
+                    "Version": spm_version
+                },
+                {
+                    "Name": "FreeSurfer",
+                    "Version": freesurfer_version
+                }
+            ],
+            "SubjectsProcessed": final_subjects, 
+            "Session": ses
+        }
+    }
+
+    output_file = os.path.join(output_path, f"dataset_description_{current_date}.json")
+    
+    # Ensure the output directory exists
+    os.makedirs(output_path, exist_ok=True)
+
+    try:
+        with open(output_file, 'w') as f:
+            json.dump(description, f, indent=2)
+        print(f"Successfully created {output_file}")
+    except Exception as e:
+        print(f"Error creating dataset_description.json: {e}")
 
 
 def main():
@@ -805,9 +901,9 @@ def main():
 
     # Set up FSL so it runs correctly in this script
     # Change file paths as needed
-    os.environ["FSLDIR"] = "/vol/software/fsl"
+    os.environ["FSLDIR"] = "/vol/software/fsl_6_0_4"
     os.environ["PATH"] = f"{os.environ['FSLDIR']}/bin:" + os.environ["PATH"]
-    subprocess.run(["bash", "-c", "source /vol/software/fsl/etc/fslconf/fsl.sh"], check=True)
+    subprocess.run(["bash", "-c", "source /vol/software/fsl_6_0_4/etc/fslconf/fsl.sh"], check=True)
 
     # Set FSL to output uncompressed NIFTI files
     os.environ["FSLOUTPUTTYPE"] = "NIFTI"
@@ -820,7 +916,8 @@ def main():
     mlab_cmd = "/usr/local/bin/matlab -nodesktop -nosplash"
 
     # Set the SPM paths so it runs correctly in this script
-    spm.SPMCommand.set_mlab_paths(paths="/home/rachel/spm12", matlab_cmd=mlab_cmd)
+    spm_path = Path("/home/rachel/spm12")
+    spm.SPMCommand.set_mlab_paths(paths=str(spm_path), matlab_cmd=mlab_cmd)
 
     # Define the SPM coregistration object
     coreg_EPI2T1 = spm.Coregister()
@@ -849,7 +946,7 @@ def main():
     )
 
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    with Pool(3) as pool:
+    with Pool(10) as pool:
         coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
 
     # Filter out any None values from the results. None gets returned when an error occurs
@@ -871,7 +968,7 @@ def main():
     )
 
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    with Pool(3) as pool:
+    with Pool(10) as pool:
         extract_wm_csf_masks_list = pool.map(execute_partial_coregistration, coregistration_list)
 
     # Filter out any None values from the results. None gets returned when an error occurs
@@ -891,7 +988,7 @@ def main():
         recon_all_path=recon_all_path,
     )
     # Use multiprocessing Pool to apply the function
-    with Pool(3) as pool:
+    with Pool(10) as pool:
         nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
     # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
@@ -911,8 +1008,8 @@ def main():
         root_path=root_path,
     )
 
-    # Currently have this not running in parallel because it fails due to memory issues when run in parallel
-    with Pool(1) as pool:
+    # Runs with 3 cores because fsl_regfilt uses a lot of memory
+    with Pool(3) as pool:
         mni_normalization_list = pool.map(transform_partial_run_nuisance_regression, nuisance_regression_list)
 
     mni_normalization_list = [result for result in mni_normalization_list if result is not None]
@@ -946,6 +1043,7 @@ def main():
     # Apply nuisance correction using multiprocessing
     transform_partial_apply_nuisance_correction = partial(apply_nuisance_correction, ses=ses, root_path=root_path)
 
+    # Runs with 3 cores because fsl_regfilt uses a lot of memory
     with Pool(3) as pool:
         qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
@@ -964,7 +1062,7 @@ def main():
         ses=ses,
     )
 
-    with Pool(3) as pool:
+    with Pool(10) as pool:
         copy_subjects = pool.map(transform_partial_fmri_quality_control, qc_list)
 
     copy_subjects = [subject for subject in copy_subjects if subject is not None]
@@ -980,7 +1078,7 @@ def main():
         prepare_and_copy_preprocessed_data, ses=ses, root_path=root_path, output_path=output_path
     )
 
-    with Pool(3) as pool:
+    with Pool(10) as pool:
         final_results = pool.map(transform_partial_prepare_and_copy, copy_subjects)
 
     final_results = [subject for subject in final_results if subject is not None]
@@ -990,6 +1088,9 @@ def main():
         f"Completed preprocessing for {len(final_results)} subjects out of a possible {len(subjects_to_process)}.\n\nSubjects that failed:\n"
         + "\n".join(failed_subjects)
     )
+
+    # Create the dataset description JSON file
+    create_dataset_description(output_path, spm_path, final_results, ses)
 
 
 if __name__ == "__main__":
