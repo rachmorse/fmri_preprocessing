@@ -2,29 +2,59 @@
 
 import os
 import shutil
+import argparse
 
 
 def main():
     """Use this script to erase the intermediate files from preprocessing to make more space."""
+    
+    parser = argparse.ArgumentParser(description="Erase intermediate files from preprocessing.")
+    parser.add_argument("--dry-run", action="store_true", help="Print what would be deleted without actually deleting.")
+    args = parser.parse_args()
+    
+    dry_run = args.dry_run
 
-    ses = "ses-02"
+    ses = "ses-01"
     root = "/home/rachel/Desktop/preprocessing-updated_reconall"
+    shared_root = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preproc_fs6-recon"
 
-    total_dirs_deleted = 0
-    total_files_deleted = 0
+    # stats = {'dirs': 0, 'files': 0}
+    stats = [0, 0] # [dirs, files]
+
+    def safe_remove(path):
+        if not os.path.exists(path):
+            return
+
+        if os.path.isdir(path):
+            if dry_run:
+                print(f"[DRY RUN] Would delete directory: {path}")
+            else:
+                shutil.rmtree(path, ignore_errors=True)
+            stats[0] += 1
+        else:
+            if dry_run:
+                print(f"[DRY RUN] Would delete file: {path}")
+            else:
+                os.remove(path)
+            stats[1] += 1
 
     subjects_root = os.path.join(root, "fmri2standard")
-    finished_root = os.path.join(root, "resting_preprocessed")
+    local_finished_root = os.path.join(root, "resting_preprocessed")
 
     for suj in os.listdir(subjects_root):
         suj_path = os.path.join(subjects_root, suj)
         if not (os.path.isdir(suj_path) and suj.startswith("sub-")):
             continue
 
-        finished_suj = os.path.join(finished_root, suj)
+        # Check for existence of processed data in either local or shared location
+        finished_suj_local = os.path.join(local_finished_root, suj, ses)
+        finished_suj_shared = os.path.join(shared_root, suj, ses)
 
-        # Only proceed if final output exists
-        if not os.path.isdir(finished_suj):
+        # Only proceed if final output exists in at least one location
+        data_exists_locally = os.path.isdir(finished_suj_local)
+        data_exists_shared = os.path.exists(finished_suj_shared)
+
+        if not (data_exists_locally or data_exists_shared):
             continue
 
         # Determine if the .tsv file exists
@@ -34,22 +64,16 @@ def main():
         # fMRItoStandard
         fmri2standard = os.path.join(root, "fmri2standard", suj)
         apply_topup_dir = os.path.join(fmri2standard, "apply_topup")
-        # Remove apply_topup directory if it exists
-        if os.path.exists(apply_topup_dir):
-            shutil.rmtree(apply_topup_dir, ignore_errors=True)
-            total_dirs_deleted += 1         
+        safe_remove(apply_topup_dir)        
 
         if os.path.isfile(dvars_file):
             # Remove certain directories if the .tsv (QC) file exists
             for dirname in ["binarize_mask", "mask_T1", "vol2vol"]:
                 dir_path = os.path.join(fmri2standard, dirname)
-                if os.path.exists(dir_path):
-                    shutil.rmtree(dir_path, ignore_errors=True)
-                    total_dirs_deleted += 1         
+                safe_remove(dir_path)
+            
             qc_brain_mask = os.path.join(root, "QC", suj, "brain_mask")
-            if os.path.exists(qc_brain_mask):
-                shutil.rmtree(qc_brain_mask, ignore_errors=True)
-                total_dirs_deleted += 1 
+            safe_remove(qc_brain_mask)
 
         for dirname in [
             "Corregister_SBref2SEgfm", "eliminate_first_scans", "extract_mask",
@@ -57,16 +81,12 @@ def main():
             "Topup_SEgfm_estimation", "apply_topup_to_SBref"
         ]:
             dir_path = os.path.join(fmri2standard, dirname)
-            if os.path.exists(dir_path):
-                shutil.rmtree(dir_path, ignore_errors=True)
-                total_dirs_deleted += 1 
+            safe_remove(dir_path)
 
         # Remove specific files in fmri2standard
         for fname in ["d3.js", "graph.json", "graph1.json", "index.html"]:
             f_path = os.path.join(fmri2standard, fname)
-            if os.path.exists(f_path):
-                os.remove(f_path)
-                total_files_deleted += 1 
+            safe_remove(f_path)
 
         # Nuisance
         nuisance_dir = os.path.join(root, "nuisance_correction", suj)
@@ -75,15 +95,11 @@ def main():
             "masks_csf_wm", "Merge_txt_inputs", "Merge_wm_csf"
         ]:
             dir_path = os.path.join(nuisance_dir, dirname)
-            if os.path.exists(dir_path):
-                shutil.rmtree(dir_path, ignore_errors=True)
-                total_dirs_deleted += 1 
+            safe_remove(dir_path)
 
         for fname in ["d3.js", "graph.json", "graph1.json", "index.html"]:
             f_path = os.path.join(nuisance_dir, fname)
-            if os.path.exists(f_path):
-                os.remove(f_path)
-                total_files_deleted += 1
+            safe_remove(f_path)
 
         # MNI Normalization
         normalization_dir = os.path.join(root, "normalization", suj)
@@ -93,28 +109,22 @@ def main():
             f"{suj}_{ses}_run-01_T1w.nii"
         ]:
             f_path = os.path.join(normalization_dir, fname)
-            if os.path.exists(f_path):
-                if os.path.isdir(f_path):
-                    shutil.rmtree(f_path, ignore_errors=True)
-                    total_dirs_deleted += 1 
-                else:
-                    os.remove(f_path)
-                    total_files_deleted += 1 
+            safe_remove(f_path)
 
         # BIDS copy 
         anat_dir_local = os.path.join(root, "BIDS", "anat", f"{suj}_{ses}_run-01_T1w.nii")
+        if dry_run:
+            print(f"[Check] BIDS/anat local path: {anat_dir_local}")
+        safe_remove(anat_dir_local)
 
-        if os.path.exists(anat_dir_local):
-            if os.path.isdir(anat_dir_local):
-                shutil.rmtree(anat_dir_local, ignore_errors=True)
-                total_dirs_deleted += 1 
-            else:
-                os.remove(anat_dir_local)
-                total_files_deleted += 1 
-
-    print("\n===== CLEANUP SUMMARY =====")
-    print(f"Total directories deleted: {total_dirs_deleted}")
-    print(f"Total files deleted: {total_files_deleted}")
+    if dry_run:
+        print("\n===== DRY RUN SUMMARY =====")
+        print(f"Would delete {stats[0]} directories")
+        print(f"Would delete {stats[1]} files")
+    else:
+        print("\n===== CLEANUP SUMMARY =====")
+        print(f"Total directories deleted: {stats[0]}")
+        print(f"Total files deleted: {stats[1]}")
     print("===========================\n")
 
 if __name__ == "__main__":
