@@ -1,5 +1,49 @@
 # preprocessing_parallelized.py
 
+## Getting Started
+
+### Installation
+Install dependencies using Poetry:
+   ```bash
+   poetry install
+   ```
+
+## Usage
+
+### 1. BBHI Senior Cohort
+To run the preprocessing for the BBHI senior cohort (code on `main` branch):
+
+1. Ensure you are on the `main` branch:
+   ```bash
+   git checkout main
+   ```
+2. Activate the virtual environment:
+   ```bash
+   poetry shell
+   ```
+3. Run the script:
+   ```bash
+   python preprocessing/preprocessing_parallelized.py
+   ```
+
+### 2. BBHI Cohort
+To run the preprocessing for the **BBHI cohort**, you can use the `bbhi` branch:
+
+1. Switch to the `bbhi` branch:
+   ```bash
+   git checkout bbhi
+   ```
+2. Activate the virtual environment (if not already active):
+   ```bash
+   poetry shell
+   ```
+3. Run the BBHI-specific script:
+   ```bash
+   python preprocessing/preprocessing_parallelized_bbhi.py
+   ```
+
+---
+
 ## Purpose
 This script executes the fMRI preprocessing workflow. It is designed to facilitate preprocessing and quality control for fMRI data analysis using interleaved acquisitions from a ten minute run with 750 volumes.
 
@@ -45,7 +89,5 @@ This script executes the fMRI preprocessing workflow. It is designed to facilita
 - **merge_nuisance_regressors**: Combines multiple nuisance regressors into a single matrix for filtering.
 
 ## Notes
-- This pipeline does not use global signal regression or smoothing.
-- The script supports parallel processing for efficiency.
-- Dependencies include Nipype, SPM, FSL, and Freesurfer.
+- Dependencies include SPM, FreeSurfer, and FSL.
 - After running this script, to delete intermediate files that are no longer needed, run `erase_intermetiate_files.py`.
