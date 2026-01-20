@@ -818,7 +818,8 @@ def initialize_preprocessing_dirs(recon_all_path, ses, output_path):
         subject_path = os.path.join(recon_all_path, subject_id)
 
         if os.path.isdir(subject_path):
-            subjects_to_process.add(subject_id)
+            subject_id_stripped = subject_id.split('_')[0]  # Extract 'sub-XXX' part
+            subjects_to_process.add(subject_id_stripped)
         
     # Filter to find subjects that still need processing
     subjects_needing_processing = {
@@ -952,7 +953,7 @@ def main():
     Paths for inputs and logs are defined relative to the workflow's root directory.
     """
     # Define all paths and directories for the preprocessing workflow
-    ses = "ses-01"
+    ses = "ses-02"
     root_path = "/home/rachel/Desktop/preprocessing-updated_reconall"
     bids_path = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
     recon_all_path = "/pool/guttmann/institut/UB/Superagers/MRI/derivatives/reconall_fs6"
@@ -984,10 +985,10 @@ def main():
     coreg_EPI2T1 = spm.Coregister()
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
-    # subjects_to_process = initialize_preprocessing_dirs(bids_path, ses, shared_output_path)
+    # subjects_to_process = initialize_preprocessing_dirs(recon_all_path, ses, shared_output_path)
 
     # Process a manual list
-    subjects_to_process = ['sub-1189', 'sub-4045', 'sub-4145']
+    subjects_to_process = ['sub-4071', 'sub-4042', 'sub-4178']
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
