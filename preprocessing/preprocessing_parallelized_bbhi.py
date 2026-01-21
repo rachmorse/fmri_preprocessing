@@ -889,7 +889,7 @@ def main():
     Paths for inputs and logs are defined relative to the workflow's root directory.
     """
     # Define all paths and directories for the preprocessing workflow
-    ses = "ses-02"
+    ses = "ses-01"
     root_path = "/home/rachel/Desktop/preprocessing-updated_reconall/bbhi"
     bids_path = "/pool/guttmann/institut/BBHI/MRI/BIDS"
     recon_all_path = "/pool/guttmann/institut/BBHI/MRI/derivatives/reconall_fs6"
@@ -923,7 +923,7 @@ def main():
     coreg_EPI2T1 = spm.Coregister()
 
     # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
-    subjects_to_process = ["sub-57606", "sub-159747"]
+    subjects_to_process = ["sub-126271", "sub-167505", "sub-85733"]
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
