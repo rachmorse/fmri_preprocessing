@@ -14,7 +14,7 @@ def main():
     
     dry_run = args.dry_run
 
-    ses = "ses-01"
+    ses = "ses-02"
     root = "/home/rachel/Desktop/preprocessing-updated_reconall"
     shared_root = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preproc_fs6-recon"
 
