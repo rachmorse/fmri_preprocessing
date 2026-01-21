@@ -988,7 +988,8 @@ def main():
     # subjects_to_process = initialize_preprocessing_dirs(recon_all_path, ses, shared_output_path)
 
     # Process a manual list
-    subjects_to_process = ['sub-4071', 'sub-4042', 'sub-4178']
+    subjects_to_process = ['sub-1189', 'sub-3012', 'sub-1196']
+
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
