@@ -431,7 +431,7 @@ def mni_normalization(subject_id, ses, root_path, bids_path):
         subprocess.run(["gunzip", "-f", sbref_niigzcopy], check=True)
 
         # Perform MNI normalization for sbref
-        MNI = spm.preprocess.Normalize12(mfile=False)
+        MNI = spm.preprocess.Normalize12()
         MNI.inputs.image_to_align = T1_nii
         MNI.inputs.apply_to_files = [sbref_nii]
         MNI.inputs.write_bounding_box = [
@@ -441,7 +441,7 @@ def mni_normalization(subject_id, ses, root_path, bids_path):
         MNI.run()
 
         # Perform MNI normalization seperately for bold (NOTE that when this is run in the same command as sbref it outputs a truncated file, unclear why)
-        MNI = spm.preprocess.Normalize12(mfile=False)
+        MNI = spm.preprocess.Normalize12()
         MNI.inputs.image_to_align = T1_nii
         MNI.inputs.apply_to_files = [bold_nii]
         MNI.inputs.write_bounding_box = [
@@ -1060,7 +1060,7 @@ def run_preprocessing(
     os.makedirs(root_path, exist_ok=True)
 
     # Define the SPM coregistration object
-    coreg_EPI2T1 = spm.Coregister(mfile=False)
+    coreg_EPI2T1 = spm.Coregister()
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
