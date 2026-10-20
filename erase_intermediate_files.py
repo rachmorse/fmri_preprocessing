@@ -38,6 +38,28 @@ def safe_remove(path, dry_run, stats):
         stats["files"] += 1
 
 
+def remove_unzipped_coregistered(fmri2standard, suj, ses, dry_run, stats):
+    """Remove uncompressed coregistered images that have a .nii.gz copy.
+
+    These are left over when a subject is coregistered again; later steps only read the .nii.gz.
+
+    Args:
+        fmri2standard (str): The subject's fmri2standard folder.
+        suj (str): The subject ID.
+        ses (str): The session for the data.
+        dry_run (bool): Whether to only print what would be deleted.
+        stats (dict): Counts of deleted `dirs` and `files`, updated in place.
+    """
+    images = {
+        "spm_coregister2T1_bold": f"{suj}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii",
+        "spm_coregister2T1_sbref": f"{suj}_{ses}_task-rest_dir-ap_run-01_sbref_flirt_corrected_coregistered2T1.nii",
+    }
+    for dirname, image in images.items():
+        nii_path = os.path.join(fmri2standard, dirname, image)
+        if os.path.isfile(f"{nii_path}.gz"):
+            safe_remove(nii_path, dry_run, stats)
+
+
 def erase_session(cohort, ses, dry_run, stats):
     """Erase the intermediate files of every finished subject in one cohort and session.
 
@@ -60,8 +82,10 @@ def erase_session(cohort, ses, dry_run, stats):
         if not (os.path.isdir(suj_path) and suj.startswith("sub-")) or (SUBJECTS and suj not in SUBJECTS):
             continue
 
-        # Only proceed if final output exists in at least one location
-        if not any(is_processed(suj, ses, d.format(subject=suj)) for d in processed_dirs(cohort, ses)):
+        # Only proceed if final output is complete, in the local output folder if it exists, otherwise in the shared folder
+        local_dir, shared_dir = (d.format(subject=suj) for d in processed_dirs(cohort, ses))
+        finished_dir = local_dir if os.path.isdir(local_dir) else shared_dir
+        if not is_processed(suj, ses, finished_dir):
             continue
 
         # Determine if the .tsv file exists
@@ -72,6 +96,7 @@ def erase_session(cohort, ses, dry_run, stats):
         fmri2standard = os.path.join(root, "fmri2standard", suj)
         apply_topup_dir = os.path.join(fmri2standard, "apply_topup")
         safe_remove(apply_topup_dir, dry_run, stats)
+        remove_unzipped_coregistered(fmri2standard, suj, ses, dry_run, stats)
 
         if os.path.isfile(dvars_file):
             # Remove certain directories if the .tsv (QC) file exists
