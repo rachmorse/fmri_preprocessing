@@ -4,7 +4,7 @@
 Scrubbed images and their JSON sidecars are saved next to the preprocessed BOLD in the local output folder.
 
 Usage:
-    python scrubbing.py [--dry-run]
+    python scrubbing.py [--dry-run] [--overwrite]
 """
 
 import argparse
@@ -306,7 +306,7 @@ def subject_paths(cohort, ses, subject, folder_name):
         folder_name (str): Output folder, either "native_T1" or "MNI_2mm".
 
     Returns:
-        dict: Paths of the `fwd`, `bold`, `scrubbed`, `json` and `shared_scrubbed` files.
+        dict: Paths of the `fwd`, `bold`, `scrubbed`, `json`, `shared_scrubbed` and `shared_json` files.
     """
     local_dir, shared_dir = (Path(t.format(subject=subject)) / folder_name for t in processed_dirs(cohort, ses))
     stem = f"{subject}_{ses}_run-01_rest_bold_ap_{SPACES[folder_name]}"
@@ -318,7 +318,24 @@ def subject_paths(cohort, ses, subject, folder_name):
         "scrubbed": str(local_dir / f"{stem}_{suffix}.nii.gz"),
         "json": str(local_dir / f"{stem}_{suffix}.json"),
         "shared_scrubbed": str(shared_dir / f"{stem}_{suffix}.nii.gz"),
+        "shared_json": str(shared_dir / f"{stem}_{suffix}.json"),
     }
+
+
+def is_stale(paths):
+    """Checks whether the BOLD was preprocessed again after its scrubbed data was made,
+    which indicates that the sub was reprocessed and needs to be scrubbed again.
+
+    Args:
+        paths (dict): Paths returned by `subject_paths`.
+
+    Returns:
+        bool: True if the local BOLD is newer than all existing scrubbed NIfTIs and JSONs (local or shared).
+    """
+    outputs = [paths[k] for k in ("scrubbed", "json", "shared_scrubbed", "shared_json") if os.path.exists(paths[k])]
+    if not outputs or not os.path.exists(paths["bold"]):
+        return False
+    return os.path.getmtime(paths["bold"]) > max(os.path.getmtime(p) for p in outputs)
 
 
 def process_subject(subject, ses, cohort, folder_name, error_log, overwrite):
@@ -333,12 +350,14 @@ def process_subject(subject, ses, cohort, folder_name, error_log, overwrite):
         folder_name (str): Output folder, either "native_T1" or "MNI_2mm".
         error_log (str): Path to error log.
         overwrite (bool): Whether to scrub again even if a scrubbed file already exists.
+            Stale scrubbed data (older than the BOLD) is always overwritten.
 
     Returns:
         bool: True if processing was successful (even if skipped), False if error.
     """
     try:
         paths = subject_paths(cohort, ses, subject, folder_name)
+        overwrite = overwrite or is_stale(paths)
         print(f"Processing subject: {subject}")
 
         fwd_data = pd.read_csv(paths["fwd"])["FramewiseDisplacement"].tolist()
@@ -368,8 +387,10 @@ def needs_scrubbing(cohort, ses, subject, folder_name):
     """Checks whether a subject still needs scrubbing or a missing JSON sidecar.
 
     Determine processing needs:
-    1. Full scrub if no scrubbed data exists (local or shared).
-    2. JSON regeneration if scrubbed data exists but sidecar is missing.
+    1. Full scrub if the local BOLD is newer than the existing scrubbed data (local or shared).
+    2. Skip if the JSON sidecar says the subject was not scrubbed (low or high motion).
+    3. Full scrub if no scrubbed data exists (local or shared).
+    4. JSON regeneration if scrubbed data exists but sidecar is missing (local and shared).
 
     Args:
         cohort (str): Cohort identifier (e.g., "bbhi").
@@ -386,12 +407,25 @@ def needs_scrubbing(cohort, ses, subject, folder_name):
         print(f"No framewise_displ.txt found for {subject}")
         return False
 
+    if is_stale(paths):
+        print(f"Subject {subject} - BOLD is newer than its scrubbed data. Adding to process list.")
+        return True
+
+    # Local JSON first, matching the local scrubbed NIfTI
+    json_file = next((paths[k] for k in ("json", "shared_json") if os.path.exists(paths[k])), None)
+
+    # Low and high motion subjects only get a JSON sidecar, without a scrubbed NIfTI
+    if json_file:
+        with open(json_file) as f:
+            if json.load(f)["ScrubbingStatus"] != "Scrubbed":
+                return False
+
     local_exists = os.path.exists(paths["scrubbed"])
     shared_exists = os.path.exists(paths["shared_scrubbed"])
 
     if not local_exists and not shared_exists:
         return True
-    if not os.path.exists(paths["json"]):
+    if not json_file:
         print(f"Subject {subject} - Scrubbed NIfTI exists, but JSON missing. Adding to process list.")
         return True
     return False
@@ -402,17 +436,20 @@ def main():
 
     This function performs the following steps:
 
-    1. Aggregates the FWD of all processed subjects for each cohort and session.
+    1. Scrub again if the local BOLD is newer than all existing scrubbed NIfTIs and JSONs (local or shared).
     2. Generates a list of subjects to be processed for each space (native T1 and MNI).
     3. Scrubs the BOLD images by parallel processing subjects.
     4. Saves the scrubbed BOLD images and JSON sidecars next to the preprocessed BOLD.
     5. Logs errors to `scrubbing_errors_<ses>_<folder>.txt` in the output folder.
 
     Subjects in `SUBJECTS` are always scrubbed again; otherwise subjects with existing scrubbed data are skipped.
+    With `--overwrite`, listed subjects are scrubbed again even if scrubbed data exists locally or in the shared folder.
     """
     parser = argparse.ArgumentParser(description="Scrub the preprocessed BOLD images.")
     parser.add_argument("--dry-run", action="store_true", help="List the subjects that would be scrubbed and exit.")
+    parser.add_argument("--overwrite", action="store_true", help="Scrub again even if scrubbed data already exists.")
     args = parser.parse_args()
+    overwrite = args.overwrite or bool(SUBJECTS)
 
     for cohort in COHORTS:
         output_root = COHORT_CONFIG[cohort].output
@@ -438,6 +475,7 @@ def main():
 
                 print(f"Total subjects needing processing: {len(subjects)}")
                 print(f"Subjects to be processed: {subjects}")
+                print(f"Overwrite existing scrubbed data: {overwrite}")
 
                 if args.dry_run:
                     continue
@@ -445,7 +483,7 @@ def main():
                 with Pool(N_JOBS) as pool:
                     pool.starmap(
                         process_subject,
-                        [(subject, ses, cohort, folder_name, error_log, bool(SUBJECTS)) for subject in subjects],
+                        [(subject, ses, cohort, folder_name, error_log, overwrite) for subject in subjects],
                     )
 
     print("Processing complete.")
