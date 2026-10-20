@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Erase the intermediate preprocessing files of finished subjects to make more space.
 
+Also deletes the local final outputs of subjects that have been copied to the shared folder.
+
 Usage:
     python erase_intermediate_files.py [--dry-run]
 """
@@ -150,6 +152,70 @@ def erase_session(cohort, ses, dry_run, stats):
         safe_remove(anat_dir_local, dry_run, stats)
 
 
+def is_copied(local_dir, shared_dir):
+    """Checks whether every local output file has a matching copy in the shared folder.
+
+    `copy_to_shared.py` keeps the file times, and only sets them once a file is fully copied,
+    so a complete copy has the same size and modification time.
+
+    Args:
+        local_dir (str): The subject's local output folder for this session.
+        shared_dir (str): The subject's shared output folder for this session.
+
+    Returns:
+        bool: True if all local files are in the shared folder with the same size and modification time.
+    """
+    for dirpath, _, filenames in os.walk(local_dir):
+        for fname in filenames:
+            src = os.path.join(dirpath, fname)
+            dst = os.path.join(shared_dir, os.path.relpath(src, local_dir))
+            if not os.path.isfile(dst):
+                print(f"  Missing in the shared folder: {dst}")
+                return False
+            src_stat, dst_stat = os.stat(src), os.stat(dst)
+            if src_stat.st_size != dst_stat.st_size or int(src_stat.st_mtime) != int(dst_stat.st_mtime):
+                print(f"  Different in the shared folder: {dst}")
+                return False
+    return True
+
+
+def remove_copied_outputs(cohort, ses, dry_run, stats):
+    """Erase the local final outputs of subjects that have been copied to the shared folder.
+
+    Only subjects in `SUBJECTS` are erased when it is set.
+
+    Args:
+        cohort (str): The cohort to clean up.
+        ses (str): The session for the data.
+        dry_run (bool): Whether to only print what would be deleted.
+        stats (dict): Counts of deleted `dirs` and `files`, updated in place.
+    """
+    local_template, shared_template = processed_dirs(cohort, ses)
+    local_root = local_template.split("{subject}")[0]
+
+    if not os.path.isdir(local_root):
+        return
+
+    for suj in sorted(os.listdir(local_root)):
+        if not suj.startswith("sub-") or (SUBJECTS and suj not in SUBJECTS):
+            continue
+
+        local_dir, shared_dir = local_template.format(subject=suj), shared_template.format(subject=suj)
+        if not os.path.isdir(local_dir) or not is_processed(suj, ses, local_dir):
+            continue
+
+        if not is_copied(local_dir, shared_dir):
+            print(f"Keeping local outputs of {suj}: not yet copied to the shared folder")
+            continue
+
+        safe_remove(local_dir, dry_run, stats)
+
+        # Remove the subject folder too if this was its only session
+        subject_dir = os.path.join(local_root, suj)
+        if not dry_run and not os.listdir(subject_dir):
+            os.rmdir(subject_dir)
+
+
 def main():
     """Use this script to erase the intermediate files from preprocessing to make more space."""
     parser = argparse.ArgumentParser(description="Erase intermediate files from preprocessing.")
@@ -162,6 +228,7 @@ def main():
     for cohort in COHORTS:
         for ses in SESSIONS:
             erase_session(cohort, ses, dry_run, stats)
+            remove_copied_outputs(cohort, ses, dry_run, stats)
 
     if dry_run:
         print("\n===== DRY RUN SUMMARY =====")

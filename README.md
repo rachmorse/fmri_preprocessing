@@ -38,7 +38,7 @@ Run these in order from the repo root.
 3. **Copy to the shared folder**: `sudo "$(which python)" copy_to_shared.py --dry-run`, then without `--dry-run`.
    Writing to `/pool` needs sudo. Subjects already in the shared folder are skipped; add `--overwrite` to replace a reprocessed subject.
 4. **Erase intermediate files**: `python erase_intermediate_files.py --dry-run`, then without `--dry-run`.
-   Only subjects with complete final outputs are cleaned up.
+   Only subjects with complete final outputs are cleaned up. The local final outputs are also deleted once they match the copy in the shared folder.
 
 ---
 
@@ -66,7 +66,7 @@ The fMRI preprocessing steps are in `preprocessing/preprocessing_steps.py` which
 
 - **scrubbing.py**: Interpolates (or cuts) BOLD volumes with framewise displacement above the threshold and saves a JSON sidecar with the scrubbing status. Also aggregates the FWD of all processed subjects into `all_fwd_<ses>.csv`.
 - **copy_to_shared.py**: Copies each subject's final outputs, including the scrubbed files, from the local output folder to the shared folder.
-- **erase_intermediate_files.py**: Deletes the intermediate files of subjects whose final outputs are complete.
+- **erase_intermediate_files.py**: Deletes the intermediate files of subjects whose final outputs are complete, and the local final outputs of subjects that have been copied to the shared folder.
 
 ## Notes
 - Dependencies include SPM, FreeSurfer, MATLAB, and FSL.
