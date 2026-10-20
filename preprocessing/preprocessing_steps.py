@@ -15,6 +15,7 @@ os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
 os.environ['NUMEXPR_NUM_THREADS'] = '1'
 
 import shutil
+import getpass
 import socket
 import subprocess
 import json
@@ -26,8 +27,8 @@ import gzip
 from datetime import datetime
 
 # Custom workflow imports
-from bold2T1_wf import get_fmri2standard_wf
-from bold_nuisance_correction_wf import get_nuisance_regressors_wf
+from preprocessing.bold2T1_wf import get_fmri2standard_wf
+from preprocessing.bold_nuisance_correction_wf import get_nuisance_regressors_wf
 from nipype import Node, Workflow
 
 # Nipype interfaces
@@ -40,7 +41,7 @@ root_logger.setLevel(logging.ERROR)
 
 
 def transform_fmri_to_standard(
-    subject_id, ses, root_path, bids_path, recon_all_path, acparams_file, write_graph=False
+    subject_id, ses, root_path, bids_path, recon_all_path, recon_suffix, acparams_file, write_graph=False
 ) -> str:
     """Transform fMRI data to a standard space for a given subject.
 
@@ -54,6 +55,7 @@ def transform_fmri_to_standard(
         root_path (str): The path to output the products of preprocessing.
         bids_path (str): The path to the shared BIDS folder.
         recon_all_path (str): The path to the shared recon_all directory.
+        recon_suffix (str): Suffix after `{subject_id}_{ses}` in the recon-all folder name (e.g. "_run-01" for BBHI).
         acparams_file (str): The path to the acparams.txt file.
         write_graph (bool): Whether to write a workflow graph. Defaults to False.
 
@@ -95,7 +97,9 @@ def transform_fmri_to_standard(
         fmri2t1_wf.inputs.input_node.func_segfm_pa_img = (
             f"{bids_path}/{subject_id}/{ses}/fmap/{subject_id}_{ses}_acq-restsefm_dir-pa_run-01_epi.nii.gz"
         )
-        fmri2t1_wf.inputs.input_node.T1_brain_freesurfer_mask = f"{recon_all_path}/{subject_id}_{ses}/mri/brain.mgz"
+        fmri2t1_wf.inputs.input_node.T1_brain_freesurfer_mask = (
+            f"{recon_all_path}/{subject_id}_{ses}{recon_suffix}/mri/brain.mgz"
+        )
 
         if write_graph:
             fmri2t1_wf.write_graph()
@@ -196,7 +200,7 @@ def execute_coregistration(subject_id, ses, root_path, bids_path, coreg_EPI2T1):
     return subject_id
 
 
-def extract_wm_csf_masks(subject_id, ses, root_path, recon_all_path, erode=1):
+def extract_wm_csf_masks(subject_id, ses, root_path, recon_all_path, recon_suffix, erode=1):
     """Extract white matter (WM) and cerebrospinal fluid (CSF) masks for nuisance correction.
 
     This function prepares paths, creates necessary directories, and executes
@@ -207,6 +211,7 @@ def extract_wm_csf_masks(subject_id, ses, root_path, recon_all_path, erode=1):
         ses (str): The session or timepoint for the data.
         root_path (str): The path to output the products of preprocessing.
         recon_all_path (str): The path to the shared recon-all folder.
+        recon_suffix (str): Suffix after `{subject_id}_{ses}` in the recon-all folder name.
         erode (int): Erosion amount in mm. Defaults to 1.
 
     Returns:
@@ -219,7 +224,7 @@ def extract_wm_csf_masks(subject_id, ses, root_path, recon_all_path, erode=1):
         bold_filename = f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold_roi_mcf_corrected_coregistered2T1.nii.gz"
         bold2T1_path = os.path.join(root_path, "fmri2standard", subject_id, "spm_coregister2T1_bold", bold_filename)
         output_masks = os.path.join(root_path, "nuisance_correction", subject_id, "masks_csf_wm")
-        aseg_folder = os.path.join(recon_all_path, f"{subject_id}_{ses}", "mri", "aseg.mgz")
+        aseg_folder = os.path.join(recon_all_path, f"{subject_id}_{ses}{recon_suffix}", "mri", "aseg.mgz")
 
         # Create necessary directories
         os.makedirs(os.path.join(root_path, "nuisance_correction", subject_id), exist_ok=True)
@@ -426,7 +431,7 @@ def mni_normalization(subject_id, ses, root_path, bids_path):
         subprocess.run(["gunzip", "-f", sbref_niigzcopy], check=True)
 
         # Perform MNI normalization for sbref
-        MNI = spm.preprocess.Normalize12()
+        MNI = spm.preprocess.Normalize12(mfile=False)
         MNI.inputs.image_to_align = T1_nii
         MNI.inputs.apply_to_files = [sbref_nii]
         MNI.inputs.write_bounding_box = [
@@ -436,7 +441,7 @@ def mni_normalization(subject_id, ses, root_path, bids_path):
         MNI.run()
 
         # Perform MNI normalization seperately for bold (NOTE that when this is run in the same command as sbref it outputs a truncated file, unclear why)
-        MNI = spm.preprocess.Normalize12()
+        MNI = spm.preprocess.Normalize12(mfile=False)
         MNI.inputs.image_to_align = T1_nii
         MNI.inputs.apply_to_files = [bold_nii]
         MNI.inputs.write_bounding_box = [
@@ -765,54 +770,92 @@ def prepare_and_copy_preprocessed_data(subject_id, ses, root_path, output_path):
     return subject_id if all_copied else None
 
 
-def initialize_preprocessing_dirs(recon_all_path, ses, output_path):
+def missing_inputs(subject_id, ses, bids_path, recon_all_path, recon_suffix) -> list:
+    """List the input files a subject needs for preprocessing that do not exist.
+
+    Args:
+        subject_id (str): The identifier for the subject.
+        ses (str): The session or timepoint for the data.
+        bids_path (str): The path to the shared BIDS folder.
+        recon_all_path (str): The path to the recon-all data.
+        recon_suffix (str): Suffix after `{subject_id}_{ses}` in the recon-all folder name.
+
+    Returns:
+        list: Paths of the missing input files (empty if everything is there).
+    """
+    dirs = {
+        "anat": os.path.join(bids_path, subject_id, ses, "anat"),
+        "func": os.path.join(bids_path, subject_id, ses, "func"),
+        "fmap": os.path.join(bids_path, subject_id, ses, "fmap"),
+        "recon_all": os.path.join(recon_all_path, f"{subject_id}_{ses}{recon_suffix}", "mri"),
+    }
+
+    paths = {
+        "t1w": os.path.join(dirs["anat"], f"{subject_id}_{ses}_run-01_T1w.nii.gz"),
+        "bold": os.path.join(dirs["func"], f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold.nii.gz"),
+        "sbref": os.path.join(dirs["func"], f"{subject_id}_{ses}_task-rest_dir-ap_run-01_sbref.nii.gz"),
+        "segfm_ap": os.path.join(dirs["fmap"], f"{subject_id}_{ses}_acq-restsefm_dir-ap_run-01_epi.nii.gz"),
+        "segfm_pa": os.path.join(dirs["fmap"], f"{subject_id}_{ses}_acq-restsefm_dir-pa_run-01_epi.nii.gz"),
+        "brain_mask": os.path.join(dirs["recon_all"], "brain.mgz"),
+        "aseg": os.path.join(dirs["recon_all"], "aseg.mgz"),
+    }
+
+    # Check for existence of files
+    return [path for path in paths.values() if not os.path.exists(path)]
+
+
+def is_processed(subject_id, ses, subject_output_dir) -> bool:
+    """Check if a subject has all the required files in the output directory.
+
+    Args:
+        subject_id (str): The identifier for the subject.
+        ses (str): The session or timepoint for the data.
+        subject_output_dir (str): The subject's output folder for this session, containing `native_T1` and `MNI_2mm`.
+
+    Returns:
+        bool: True if all files are present, False otherwise.
+    """
+    dirs = {
+        "native_t1": os.path.join(subject_output_dir, "native_T1"),
+        "mni_2mm": os.path.join(subject_output_dir, "MNI_2mm"),
+    }
+
+    paths = {
+        "bold_native": os.path.join(dirs["native_t1"], f"{subject_id}_{ses}_run-01_rest_bold_ap_T1-space.nii.gz"),
+        "sbref_native": os.path.join(dirs["native_t1"], f"{subject_id}_{ses}_run-01_rest_sbref_ap_T1-space.nii.gz"),
+        "framew_native": os.path.join(
+            dirs["native_t1"], "framewise_displ.txt"
+        ),  # Only one framewise displacement, motion and nuissance because the T1 and MNI ones are the same
+        "motion_native": os.path.join(dirs["native_t1"], "motion.txt"),
+        "nuisance_native": os.path.join(dirs["native_t1"], "nuisance_regressors.txt"),
+        "bold_mni": os.path.join(dirs["mni_2mm"], f"{subject_id}_{ses}_run-01_rest_bold_ap_MNI-space.nii.gz"),
+        "sbref_mni": os.path.join(dirs["mni_2mm"], f"{subject_id}_{ses}_run-01_rest_sbref_ap_MNI-space.nii.gz"),
+    }
+
+    # Check for existence of files
+    return all([os.path.exists(path) for path in paths.values()])
+
+
+def initialize_preprocessing_dirs(recon_all_path, recon_suffix, bids_path, ses, processed_dirs):
     """Initialize directories and determine subjects needing processing.
 
     Args:
         recon_all_path (str): The path to the recon-all data.
+        recon_suffix (str): Suffix after `{subject_id}_{ses}` in the recon-all folder name.
+        bids_path (str): The path to the shared BIDS folder.
         ses (str): The session or timepoint for the data.
-        output_path (str): Path to the output directory for the final preprocessed data.
+        processed_dirs (list): Templates for a subject's final output folder, formatted with `subject`
+            (e.g. "/path/resting_preprocessed/{subject}/ses-01"). A subject counts as processed if it is
+            complete in any of them.
 
     Returns:
         set: A set containing identifiers of subjects yet to be processed.
     """
-
-    def is_processed(subject_id, ses, shared_output_path) -> bool:
-        """Check if a subject has all the required files in the output directory.
-
-        Args:
-            subject_id (str): The identifier for the subject.
-            ses (str): The session or timepoint for the data.
-            shared_output_path (str): The path to the shared (institut) output directory for the final preprocessed data.
-
-        Returns:
-            bool: True if all files are present, False otherwise.
-        """
-        dirs = {
-            "native_t1": os.path.join(shared_output_path, subject_id, ses, "native_T1"),
-            "mni_2mm": os.path.join(shared_output_path, subject_id, ses, "MNI_2mm"),
-        }
-
-        paths = {
-            "bold_native": os.path.join(dirs["native_t1"], f"{subject_id}_{ses}_run-01_rest_bold_ap_T1-space.nii.gz"),
-            "sbref_native": os.path.join(dirs["native_t1"], f"{subject_id}_{ses}_run-01_rest_sbref_ap_T1-space.nii.gz"),
-            "framew_native": os.path.join(
-                dirs["native_t1"], "framewise_displ.txt"
-            ),  # Only one framewise displacement, motion and nuissance because the T1 and MNI ones are the same
-            "motion_native": os.path.join(dirs["native_t1"], "motion.txt"),
-            "nuisance_native": os.path.join(dirs["native_t1"], "nuisance_regressors.txt"),
-            "bold_mni": os.path.join(dirs["mni_2mm"], f"{subject_id}_{ses}_run-01_rest_bold_ap_MNI-space.nii.gz"),
-            "sbref_mni": os.path.join(dirs["mni_2mm"], f"{subject_id}_{ses}_run-01_rest_sbref_ap_MNI-space.nii.gz"),
-        }
-
-        # Check for existence of files
-        return all([os.path.exists(path) for path in paths.values()])
-
     subjects_to_process = set()
 
     for subject_id in os.listdir(recon_all_path):
         # Ignore any entries that do not start with 'sub-' or do not match the session
-        if not (subject_id.startswith("sub-") and ses in subject_id):
+        if not (subject_id.startswith("sub-") and subject_id.endswith(f"_{ses}{recon_suffix}")):
             continue
 
         subject_path = os.path.join(recon_all_path, subject_id)
@@ -821,15 +864,22 @@ def initialize_preprocessing_dirs(recon_all_path, ses, output_path):
             subject_id_stripped = subject_id.split('_')[0]  # Extract 'sub-XXX' part
             subjects_to_process.add(subject_id_stripped)
         
+    # Skip subjects missing any input (e.g. no resting BOLD), otherwise they fail at step 1 on every run
+    subjects_to_process = {
+        subject_id for subject_id in subjects_to_process
+        if not missing_inputs(subject_id, ses, bids_path, recon_all_path, recon_suffix)
+    }
+
     # Filter to find subjects that still need processing
     subjects_needing_processing = {
-        subject_id for subject_id in subjects_to_process if not is_processed(subject_id, ses, output_path)
+        subject_id for subject_id in subjects_to_process
+        if not any(is_processed(subject_id, ses, d.format(subject=subject_id)) for d in processed_dirs)
     }
 
     return subjects_needing_processing
 
 
-def change_logger_file(file_name: str, log_dir: str = "logs"):
+def change_logger_file(file_name: str, log_dir: str):
     """Configure the logging settings for a specific processing step.
 
     This function sets up a logging configuration that writes logs to a file
@@ -837,6 +887,7 @@ def change_logger_file(file_name: str, log_dir: str = "logs"):
 
     Args:
         file_name (str): The name of the file to write logs to.
+        log_dir (str): The folder to write the log file to.
     """
     root_logger = logging.getLogger()
 
@@ -891,7 +942,7 @@ def create_dataset_description(output_path: str, spm_path: Path, final_subjects:
     hostname = socket.gethostname()
 
     # Get the current user
-    user = os.getlogin()
+    user = getpass.getuser()
 
     description = {
         "Name": "fMRI Preprocessing Output " + current_date,
@@ -933,8 +984,46 @@ def create_dataset_description(output_path: str, spm_path: Path, final_subjects:
         print(f"Error creating dataset_description.json: {e}")
 
 
-def main():
-    """Main function for executing the preprocessing workflow of fMRI data.
+def setup_software(fsl_dir, freesurfer_home, spm_path, matlab_cmd):
+    """Set up FSL, FreeSurfer and SPM/MATLAB so they run correctly in this script.
+
+    Args:
+        fsl_dir (Path): The FSL installation directory.
+        freesurfer_home (Path): The FreeSurfer installation directory.
+        spm_path (Path): The SPM installation directory.
+        matlab_cmd (str): The command used to launch MATLAB.
+    """
+    # Set up FSL so it runs correctly in this script
+    os.environ["FSLDIR"] = str(fsl_dir)
+    os.environ["PATH"] = f"{os.environ['FSLDIR']}/bin:" + os.environ["PATH"]
+    subprocess.run(["bash", "-c", f"source {os.environ['FSLDIR']}/etc/fslconf/fsl.sh"], check=True)
+
+    # Set FSL to output uncompressed NIFTI files
+    os.environ["FSLOUTPUTTYPE"] = "NIFTI"
+
+    # Set up FreeSurfer so it runs with the same version used in BBHI
+    os.environ["FREESURFER_HOME"] = str(freesurfer_home)
+    os.environ["PATH"] = f"{os.environ['FREESURFER_HOME']}/bin:" + os.environ["PATH"]
+
+    # Set the SPM paths so it runs correctly in this script
+    spm.SPMCommand.set_mlab_paths(paths=str(spm_path), matlab_cmd=matlab_cmd)
+
+
+def run_preprocessing(
+    subjects_to_process,
+    ses,
+    root_path,
+    output_path,
+    bids_path,
+    recon_all_path,
+    recon_suffix,
+    acparams_file,
+    spm_path,
+    log_dir,
+    n_jobs,
+    n_jobs_high_mem,
+):
+    """Function for executing the preprocessing workflow of fMRI data.
 
     This function performs the following steps:
     1. Transforms fMRI data to standard space using parallel processing.
@@ -950,46 +1039,28 @@ def main():
     The process makes use of multiprocessing to parallelize tasks where possible,
     and logs any subjects with errors at each step.
 
-    Paths for inputs and logs are defined relative to the workflow's root directory.
+    Args:
+        subjects_to_process (list): Identifiers of the subjects to process.
+        ses (str): The session or timepoint for the data.
+        root_path (str): The path to output the products of preprocessing.
+        output_path (str): The path to the output directory for the final preprocessed data.
+        bids_path (str): The path to the shared BIDS folder.
+        recon_all_path (str): The path to the shared recon-all folder.
+        recon_suffix (str): Suffix after `{subject_id}_{ses}` in the recon-all folder name.
+        acparams_file (str): The path to the acparams.txt file.
+        spm_path (Path): The path to the SPM installation directory.
+        log_dir (str): The folder for the per-step logs.
+        n_jobs (int): Number of cores for most steps.
+        n_jobs_high_mem (int): Number of cores for the steps using fsl_regfilt, which uses a lot of memory.
+
+    Returns:
+        list: One dict per step with the number of subjects in, the number successful and the failed IDs.
     """
-    # Define all paths and directories for the preprocessing workflow
-    ses = "ses-02"
-    root_path = "/home/rachel/Desktop/preprocessing-updated_reconall"
-    bids_path = "/pool/guttmann/institut/UB/Superagers/MRI/BIDS"
-    recon_all_path = "/pool/guttmann/institut/UB/Superagers/MRI/derivatives/reconall_fs6"
-    acparams_file = Path("/pool/guttmann/laboratori/main_preprocessingBOLD/updated_preprocessing/acparams_hcp.txt")
-    output_path = "/home/rachel/Desktop/preprocessing-updated_reconall/resting_preprocessed/"
-    shared_output_path = "/pool/guttmann/institut/UB/Superagers/MRI/resting_preproc_fs6-recon"
-
-    # Set up FSL so it runs correctly in this script
-    # Change file paths as needed
-    os.environ["FSLDIR"] = "/vol/software/fsl_6_0_4"
-    os.environ["PATH"] = f"{os.environ['FSLDIR']}/bin:" + os.environ["PATH"]
-    subprocess.run(["bash", "-c", "source /vol/software/fsl_6_0_4/etc/fslconf/fsl.sh"], check=True)
-
-    # Set FSL to output uncompressed NIFTI files
-    os.environ["FSLOUTPUTTYPE"] = "NIFTI"
-
-    # Set up FreeSurfer so it runs with the same version used in BBHI
-    os.environ["FREESURFER_HOME"] = "/vol/software/freesurfer-6.0" 
-    os.environ["PATH"] = f"{os.environ['FREESURFER_HOME']}/bin:" + os.environ["PATH"]
-
-    # Configure MATLAB so it runs correctly in this script
-    mlab_cmd = "/usr/local/bin/matlab -nodesktop -nosplash"
-
-    # Set the SPM paths so it runs correctly in this script
-    spm_path = Path("/home/rachel/spm12")
-    spm.SPMCommand.set_mlab_paths(paths=str(spm_path), matlab_cmd=mlab_cmd)
+    # Create root dir if it doesn't exist
+    os.makedirs(root_path, exist_ok=True)
 
     # Define the SPM coregistration object
-    coreg_EPI2T1 = spm.Coregister()
-
-    # Run `initialize_preprocessing_dirs` to retrieve the list of subjects to process
-    # subjects_to_process = initialize_preprocessing_dirs(recon_all_path, ses, shared_output_path)
-
-    # Process a manual list
-    subjects_to_process = ['sub-1189', 'sub-3012', 'sub-1196']
-
+    coreg_EPI2T1 = spm.Coregister(mfile=False)
 
     print(f"Subjects to process: {len(subjects_to_process)} {subjects_to_process}")
 
@@ -999,7 +1070,7 @@ def main():
 
     # Step 1. Transform fMRI data to standard space
     # Setup logging
-    change_logger_file("log_01_transform_fmri_to_standard")
+    change_logger_file("log_01_transform_fmri_to_standard", log_dir)
 
     # Define the partial function with fixed arguments
     transform_partial_fmri_to_standard = partial(
@@ -1008,11 +1079,12 @@ def main():
         ses=ses,
         bids_path=bids_path,
         recon_all_path=recon_all_path,
+        recon_suffix=recon_suffix,
         acparams_file=acparams_file,
     )
 
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    with Pool(10) as pool:
+    with Pool(n_jobs) as pool:
         coregistration_list = pool.map(transform_partial_fmri_to_standard, subjects_to_process)
 
     # Filter out any None values from the results. None gets returned when an error occurs
@@ -1022,7 +1094,7 @@ def main():
     print(f"Subjects to process for coregistration: {len(coregistration_list)} / {len(subjects_to_process)}")
 
     # Setup logging
-    change_logger_file("log_02_execute_coregistration")
+    change_logger_file("log_02_execute_coregistration", log_dir)
 
     # Define the partial function with fixed arguments
     execute_partial_coregistration = partial(
@@ -1034,7 +1106,7 @@ def main():
     )
 
     # Set up a multiprocessing pool to parallelize fMRI standard space transformation
-    with Pool(10) as pool:
+    with Pool(n_jobs) as pool:
         extract_wm_csf_masks_list = pool.map(execute_partial_coregistration, coregistration_list)
 
     # Filter out any None values from the results. None gets returned when an error occurs
@@ -1044,7 +1116,7 @@ def main():
     print(f"Subjects to process for extracting WM/CSF: {len(extract_wm_csf_masks_list)} / {len(subjects_to_process)}")
 
     # Setup logging
-    change_logger_file("log_03a_extract_wm_csf_masks")
+    change_logger_file("log_03a_extract_wm_csf_masks", log_dir)
 
     # Apply nuisance correction initial step using multiprocessing
     transform_partial_extract_wm_csf_masks = partial(
@@ -1052,9 +1124,10 @@ def main():
         ses=ses,
         root_path=root_path,
         recon_all_path=recon_all_path,
+        recon_suffix=recon_suffix,
     )
     # Use multiprocessing Pool to apply the function
-    with Pool(10) as pool:
+    with Pool(n_jobs) as pool:
         nuisance_regression_list = pool.map(transform_partial_extract_wm_csf_masks, extract_wm_csf_masks_list)
 
     # Identify subjects needing nuisance correction to run (`run_nuisance_regression`), excluding those with errors from `extract_wm_csf_masks`
@@ -1065,7 +1138,7 @@ def main():
     print(f"Subjects to process for nuisance workflow: {len(nuisance_regression_list)} / {len(extract_wm_csf_masks_list)}")
 
     # Setup logging
-    change_logger_file("log_03b_run_nuisance_regression")
+    change_logger_file("log_03b_run_nuisance_regression", log_dir)
 
     # Apply nuisance regression using multiprocessing
     transform_partial_run_nuisance_regression = partial(
@@ -1075,7 +1148,7 @@ def main():
     )
 
     # Runs with 3 cores because fsl_regfilt uses a lot of memory
-    with Pool(3) as pool:
+    with Pool(n_jobs_high_mem) as pool:
         mni_normalization_list = pool.map(transform_partial_run_nuisance_regression, nuisance_regression_list)
 
     mni_normalization_list = [result for result in mni_normalization_list if result is not None]
@@ -1084,7 +1157,7 @@ def main():
     print(f"Subjects to process for MNI normalization: {len(mni_normalization_list)} / {len(nuisance_regression_list)}")
 
     # Setup logging
-    change_logger_file("log_04_mni_normalization")
+    change_logger_file("log_04_mni_normalization", log_dir)
 
     # Perform MNI normalization using multiprocessing
     transform_partial_mni_normalization = partial(
@@ -1104,13 +1177,13 @@ def main():
     print(f"Subjects to process for applying nuisance: {len(regression_list)} / {len(mni_normalization_list)}")
 
     # Setup logging
-    change_logger_file("log_05_apply_nuisance_correction")
+    change_logger_file("log_05_apply_nuisance_correction", log_dir)
 
     # Apply nuisance correction using multiprocessing
     transform_partial_apply_nuisance_correction = partial(apply_nuisance_correction, ses=ses, root_path=root_path)
 
     # Runs with 3 cores because fsl_regfilt uses a lot of memory
-    with Pool(3) as pool:
+    with Pool(n_jobs_high_mem) as pool:
         qc_list = pool.map(transform_partial_apply_nuisance_correction, regression_list)
 
     qc_list = [subject for subject in qc_list if subject is not None]
@@ -1119,7 +1192,7 @@ def main():
     print(f"Subjects to process for QC: {len(qc_list)} / {len(regression_list)}")
 
     # Setup logging
-    change_logger_file("log_06_fmri_quality_control")
+    change_logger_file("log_06_fmri_quality_control", log_dir)
 
     # Perform fMRI quality control using multiprocessing
     transform_partial_fmri_quality_control = partial(
@@ -1128,7 +1201,7 @@ def main():
         ses=ses,
     )
 
-    with Pool(10) as pool:
+    with Pool(n_jobs) as pool:
         copy_subjects = pool.map(transform_partial_fmri_quality_control, qc_list)
 
     copy_subjects = [subject for subject in copy_subjects if subject is not None]
@@ -1137,14 +1210,14 @@ def main():
     print(f"Subjects to process for copying: {len(copy_subjects)} / {len(qc_list)}")
 
     # Setup logging
-    change_logger_file("log_07_prepare_and_copy_preprocessed_data")
+    change_logger_file("log_07_prepare_and_copy_preprocessed_data", log_dir)
 
     # Prepare and copy preprocessed data using multiprocessing
     transform_partial_prepare_and_copy = partial(
         prepare_and_copy_preprocessed_data, ses=ses, root_path=root_path, output_path=output_path
     )
 
-    with Pool(10) as pool:
+    with Pool(n_jobs) as pool:
         final_results = pool.map(transform_partial_prepare_and_copy, copy_subjects)
 
     final_results = [subject for subject in final_results if subject is not None]
@@ -1159,5 +1232,18 @@ def main():
     create_dataset_description(output_path, spm_path, final_results, ses)
 
 
-if __name__ == "__main__":
-    main()
+    # Number of subjects going into each step and which ones failed, for the pipeline summary
+    step_results = [
+        ("01_transform_fmri_to_standard", subjects_to_process, coregistration_list),
+        ("02_execute_coregistration", coregistration_list, extract_wm_csf_masks_list),
+        ("03a_extract_wm_csf_masks", extract_wm_csf_masks_list, nuisance_regression_list),
+        ("03b_run_nuisance_regression", nuisance_regression_list, mni_normalization_list),
+        ("04_mni_normalization", mni_normalization_list, regression_list),
+        ("05_apply_nuisance_correction", regression_list, qc_list),
+        ("06_fmri_quality_control", qc_list, copy_subjects),
+        ("07_prepare_and_copy_preprocessed_data", copy_subjects, final_results),
+    ]
+    return [
+        {"step": step, "n_input": len(before), "n_successful": len(after), "failed": sorted(set(before) - set(after))}
+        for step, before, after in step_results
+    ]
