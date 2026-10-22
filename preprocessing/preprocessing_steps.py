@@ -26,6 +26,8 @@ from typing import Optional
 import gzip
 from datetime import datetime
 
+import nibabel as nib
+
 # Custom workflow imports
 from preprocessing.bold2T1_wf import get_fmri2standard_wf
 from preprocessing.bold_nuisance_correction_wf import get_nuisance_regressors_wf
@@ -38,6 +40,9 @@ from nipype.interfaces import spm, utility
 # Set up logging
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.ERROR)
+
+# Subjects whose resting BOLD run is shorter than this are not processed
+MIN_RUN_SECONDS = 600
 
 
 def transform_fmri_to_standard(
@@ -802,6 +807,27 @@ def missing_inputs(subject_id, ses, bids_path, recon_all_path, recon_suffix) -> 
     return [path for path in paths.values() if not os.path.exists(path)]
 
 
+def is_short_run(subject_id, ses, bids_path) -> bool:
+    """Check if a subject's resting BOLD run is shorter than `MIN_RUN_SECONDS`.
+
+    Only the image header is read, so this is fast.
+
+    Args:
+        subject_id (str): The identifier for the subject.
+        ses (str): The session or timepoint for the data.
+        bids_path (str): The path to the shared BIDS folder.
+
+    Returns:
+        bool: True if the run is shorter than `MIN_RUN_SECONDS`, False otherwise.
+    """
+    bold = os.path.join(bids_path, subject_id, ses, "func", f"{subject_id}_{ses}_task-rest_dir-ap_run-01_bold.nii.gz")
+    header = nib.load(bold).header
+    n_volumes = header.get_data_shape()[3]
+    tr = header.get_zooms()[3]
+
+    return round(n_volumes * tr) < MIN_RUN_SECONDS
+
+
 def is_processed(subject_id, ses, subject_output_dir) -> bool:
     """Check if a subject has all the required files in the output directory.
 
@@ -874,7 +900,15 @@ def initialize_preprocessing_dirs(recon_all_path, recon_suffix, bids_path, ses, 
         if not any(is_processed(subject_id, ses, d.format(subject=subject_id)) for d in processed_dirs)
     }
 
-    return subjects_needing_processing
+    # Skip subjects with a run shorter than 10 min, they are not included in the analyses
+    short_runs = {
+        subject_id for subject_id in subjects_needing_processing
+        if is_short_run(subject_id, ses, bids_path)
+    }
+    if short_runs:
+        print(f"{ses}: {len(short_runs)} subjects skipped because of a run shorter than 10 min")
+
+    return subjects_needing_processing - short_runs
 
 
 def change_logger_file(file_name: str, log_dir: str):

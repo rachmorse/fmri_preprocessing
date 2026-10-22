@@ -13,6 +13,7 @@ from typing import Dict, List, Literal
 
 from preprocessing.preprocessing_steps import (
     initialize_preprocessing_dirs,
+    is_short_run,
     missing_inputs,
     run_preprocessing,
     setup_software,
@@ -21,8 +22,8 @@ from preprocessing.preprocessing_steps import (
 Cohort = Literal["bbhi", "bbhi_senior"]
 Session = Literal["ses-01", "ses-02"]
 
-COHORTS: List[Cohort] = ["bbhi"]
-SESSIONS: List[Session] = ["ses-02"]
+COHORTS: List[Cohort] = ["bbhi", "bbhi_senior"]
+SESSIONS: List[Session] = ["ses-01", "ses-02"]
 SUBJECTS: List[str] = []  # Leave empty to auto-detect unprocessed subjects
 
 # Steps fail when too many subjects run in parallel so be careful increasing these
@@ -120,7 +121,8 @@ def processed_dirs(cohort: Cohort, ses: Session) -> List[str]:
 def select_subjects(cohort: Cohort, ses: Session) -> List[str]:
     """Get the subjects to process for a cohort and session.
 
-    Uses `SUBJECTS` when set, keeping only those with all inputs. Otherwise auto-detects unprocessed subjects.
+    Uses `SUBJECTS` when set, keeping only those with all inputs and a run of at least 10 min. Otherwise auto-detects
+    unprocessed subjects.
 
     Args:
         cohort: Cohort name.
@@ -137,6 +139,7 @@ def select_subjects(cohort: Cohort, ses: Session) -> List[str]:
         )
 
     subjects = []
+    n_short_runs = 0
     for subject in SUBJECTS:
         if not (cfg.bids / subject).is_dir():
             continue
@@ -144,7 +147,13 @@ def select_subjects(cohort: Cohort, ses: Session) -> List[str]:
         if missing:
             print(f"Skipping {subject} ({cohort} {ses}), missing inputs:\n  " + "\n  ".join(missing))
             continue
+        if is_short_run(subject, ses, cfg.bids):
+            n_short_runs += 1
+            continue
         subjects.append(subject)
+
+    if n_short_runs:
+        print(f"{cohort} {ses}: {n_short_runs} subjects skipped because of a run shorter than 10 min")
 
     return sorted(subjects)
 
