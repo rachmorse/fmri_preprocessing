@@ -5,20 +5,22 @@ from nipype.interfaces import freesurfer, fsl, utility
 
 
 def get_fmri2standard_wf(tvols, subject_id, acq_params):
-    """Estimates transformation from Gradient Field Distortion-warped BOLD to T1.
+    """Realigns the BOLD and corrects it for Gradient Field Distortion.
 
     In general:
-        BOLD is field-inhomogeneity corrected and coregistered into standard space (T1).
+        BOLD is realigned and field-inhomogeneity corrected. Coregistration to the T1 is done
+        afterwards with SPM (`execute_coregistration`).
 
     The workflow performs the following steps:
-    1.  Coregister SBref to SEgfmAP (fsl.FLIRT).
-    2.  Realign BOLD to corrected SBref (fsl.MCFLIRT).
-    3.  Estimate field inhomogeneity correction of SBref from SEfm_AP and SEfm_PA (fsl.TOPUP).
-    4.  Apply field inhomogeneity correction to SBref (fsl.ApplyTOPUP).
-    5.  Apply field inhomogeneity correction to BOLD (fsl.ApplyTOPUP).
-    6.  Transform FreeSurfer brain mask (brain.mgz) to T1 space (freesurfer.ApplyVolTransform),
-        binarize it (fsl.UnaryMaths), and extract the mask from T1 (fsl.BinaryMaths).
-    7.  Coregister BOLD (field-inhomogeneity corrected) to Standard T1 (fsl.Epi2Reg).
+    1.  Average the SEgfmAP volumes (fsl.MeanImage).
+    2.  Coregister SBref to the average SEgfmAP (fsl.FLIRT).
+    3.  Remove the first BOLD volumes (fsl.ExtractROI).
+    4.  Realign BOLD to coregistered SBref (fsl.MCFLIRT).
+    5.  Estimate field inhomogeneity correction of SBref from SEfm_AP and SEfm_PA (fsl.TOPUP).
+    6.  Apply field inhomogeneity correction to SBref (fsl.ApplyTOPUP).
+    7.  Apply field inhomogeneity correction to BOLD (fsl.ApplyTOPUP).
+    8.  Extract the T1 brain mask (fsl.BET), binarize it (fsl.UnaryMaths), and extract the mask
+        from T1 (fsl.BinaryMaths).
 
     Args:
         tvols (list): List containing [t_initial, t_final] volumes included in the preprocess.
